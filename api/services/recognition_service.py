@@ -33,7 +33,7 @@ _ai_result_cache: dict = {}
 
 
 async def prepopulate_ai_cache(files: list) -> None:
-    """预填充 AI 结果缓存：对每个唯一的 group_id 调用一次 AI。"""
+    """预填充 AI 结果缓存：对每个唯一的 group_id 并发调用一次 AI。"""
     unique_groups = {}
     for f in files:
         gid = getattr(f, "group_id", None) or (f.get("group_id") if isinstance(f, dict) else None)
@@ -45,7 +45,7 @@ async def prepopulate_ai_cache(files: list) -> None:
     if not unique_groups:
         return
 
-    for gid, (fn, fp) in unique_groups.items():
+    async def _prepopulate_one(gid, fn, fp):
         try:
             pure_name, _ = os.path.splitext(fn or "unknown.mkv")
             result = await asyncio.to_thread(parse_media_filename, f"{pure_name}.mkv", fp)
@@ -54,6 +54,8 @@ async def prepopulate_ai_cache(files: list) -> None:
                 logger.info("预填充AI缓存: group_id=%s, title=%s", gid, result["title"])
         except Exception as e:
             logger.warning("预填充AI缓存失败: group_id=%s, error=%s", gid, e)
+
+    await asyncio.gather(*[_prepopulate_one(gid, fn, fp) for gid, (fn, fp) in unique_groups.items()])
 
 
 class RecognitionService:

@@ -12,7 +12,7 @@ services:
       # AI API 配置（可选，用于从目录路径推断剧名/电影名）
       - METADATA_AI_API_KEY=${AI_API_KEY:-}
       - METADATA_AI_BASE_URL=${AI_BASE_URL:-https://api.deepseek.com}
-      - METADATA_AI_MODEL=${AI_MODEL:-deepseek-v4-pro}
+      - METADATA_AI_MODEL=${AI_MODEL:-deepseek-v4-flash}
       # 部署模式: local / remote
       - METADATA_MODE=${METADATA_MODE:-local}
       # Web UI 登录凭证（留空则不需要登录）

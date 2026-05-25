@@ -129,6 +129,7 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
         .manual-log-item { padding: 2px 0 2px 22px; font-size: 12.5px; line-height: 1.5; text-align: left; }
         .progress-bar { height: 6px; background: #e8ecf1; border-radius: 3px; margin: 8px 0; overflow: hidden; }
         .progress-bar-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.3s; width: 0%; }
+        .wip-badge { display:inline-block; font-size:10px; font-weight:400; background:#f39c12; color:#fff; border-radius:3px; padding:1px 5px; vertical-align:middle; margin-left:4px; }
         .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: white; border-radius: var(--radius); width: 90%; max-width: 700px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
@@ -282,7 +283,7 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
       <span class="icon">⚙️</span><span>配置</span>
     </div>
     <div class="nav-item" data-tab="organize">
-      <span class="icon">🔗</span><span>整理</span>
+      <span class="icon">🔗</span><span>整理 <span class="wip-badge">待完善</span></span>
     </div>
     <div class="nav-item" data-tab="about">
       <span class="icon">ℹ️</span><span>关于</span>
@@ -471,7 +472,7 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
     </div>
     <div class="form-group">
       <label>AI 模型</label>
-      <input type="text" id="configAiModel" placeholder="deepseek-v4-pro">
+      <input type="text" id="configAiModel" placeholder="deepseek-v4-flash">
     </div>
     <div class="form-group">
       <label>单次调用 Token 上限 <span style="color:var(--text-light);font-weight:400">（DeepSeek 推理模型建议 500+）</span></label>
@@ -523,7 +524,7 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
 <!-- ===== 整理 ===== -->
 <div class="tab" id="tab-organize">
   <div class="tab-header">
-    <h2>📁 归档整理</h2>
+    <h2>📁 归档整理 <span class="wip-badge">待完善</span></h2>
     <p>将识别后的媒体文件硬链接到媒体库目录，保留做种同时供 Emby/Jellyfin 使用</p>
   </div>
   <div class="card" style="margin-bottom:16px">
@@ -1186,6 +1187,11 @@ function downloadFailureLog() {
 function escapeHtml(str) {
   if (!str) return "";
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function maskKey(key) {
+  if (!key || key.length < 8) return key;
+  return key.slice(0, 4) + "*".repeat(key.length - 8) + key.slice(-4);
 }
 
 // === 完成弹窗 ===
@@ -2188,9 +2194,16 @@ function togglePasswordVisibility(inputId, btn) {
   if (input.type === "password") {
     input.type = "text";
     btn.textContent = "🙈";
+    if (!input.value && input.dataset.actualKey) {
+      input.value = input.dataset.actualKey;
+    }
   } else {
     input.type = "password";
     btn.textContent = "👁";
+    if (input.dataset.actualKey && input.value === input.dataset.actualKey) {
+      input.value = "";
+      input.placeholder = maskKey(input.dataset.actualKey);
+    }
   }
 }
 
@@ -2207,7 +2220,9 @@ async function loadConfig() {
       `AI 模型: ${data.ai_model || "默认"}`,
       `Token 上限: ${data.ai_max_tokens || 200}`,
     ];
-    show(el, lines.join("\n"), "info");
+    el.style.display = "block";
+    el.className = "result-box info";
+    el.innerHTML = lines.map(l => `<div style="line-height:1.8">${escapeHtml(l)}</div>`).join("");
     if (data.ai_base_url) {
       document.getElementById("configAiUrl").value = data.ai_base_url;
     }
@@ -2220,20 +2235,23 @@ async function loadConfig() {
     if (data.tmdb_api_key_set) {
       const inp = document.getElementById("configTmdb");
       inp.value = "";
-      inp.placeholder = "•••••••••••••••";
+      inp.placeholder = maskKey(data.tmdb_api_key);
       inp.dataset.masked = "true";
+      inp.dataset.actualKey = data.tmdb_api_key;
     }
     if (data.bgm_api_key_set) {
       const inp = document.getElementById("configBgm");
       inp.value = "";
-      inp.placeholder = "•••••••••••••••";
+      inp.placeholder = maskKey(data.bgm_api_key);
       inp.dataset.masked = "true";
+      inp.dataset.actualKey = data.bgm_api_key;
     }
     if (data.ai_api_key_set) {
       const inp = document.getElementById("configAiKey");
       inp.value = "";
-      inp.placeholder = "•••••••••••••••";
+      inp.placeholder = maskKey(data.ai_api_key);
       inp.dataset.masked = "true";
+      inp.dataset.actualKey = data.ai_api_key;
     }
   } catch (e) {
     show(el, e.message, "error");

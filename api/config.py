@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # AI 配置（OpenAI 兼容 API，用于从目录路径推断剧名/电影名）
     ai_api_key: str = ""
     ai_base_url: str = "https://api.deepseek.com"
-    ai_model: str = "deepseek-v4-pro"
+    ai_model: str = "deepseek-v4-flash"
     ai_max_tokens: int = 10000
 
     # Web UI 登录凭证（留空则不需要登录）
@@ -90,7 +90,7 @@ class Settings(BaseSettings):
         if "ai_base_url" in config_dict:
             self.ai_base_url = config_dict.get("ai_base_url", "https://api.deepseek.com")
         if "ai_model" in config_dict:
-            self.ai_model = config_dict.get("ai_model", "deepseek-v4-pro")
+            self.ai_model = config_dict.get("ai_model", "deepseek-v4-flash")
         if "ai_max_tokens" in config_dict:
             self.ai_max_tokens = int(config_dict.get("ai_max_tokens", 10000))
 
