@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Renamer API</title>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --sidebar: #1e2a3a;
+  --sidebar-hover: #2a3a4e;
+  --sidebar-active: #3a5a8e;
+  --card: #ffffff;
+  --border: #e0e3e8;
+  --text: #2c3e50;
+  --text-light: #7f8c9b;
+  --primary: #3498db;
+  --primary-dark: #2980b9;
+  --success: #27ae60;
+  --danger: #e74c3c;
+  --warning: #f39c12;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg); color: var(--text); display: flex; min-height: 100vh;
+}
+.sidebar {
+  width: 220px; background: var(--sidebar); color: #fff;
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.sidebar-header {
+  padding: 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sidebar-header h1 { font-size: 16px; font-weight: 600; }
+.sidebar-header .mode-badge {
+  display: inline-block; margin-top: 6px; font-size: 11px;
+  padding: 2px 8px; border-radius: 10px; background: var(--primary);
+}
+.sidebar-header .mode-badge.remote { background: var(--warning); color: #333; }
+.sidebar-nav { flex: 1; padding: 8px 0; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; cursor: pointer; font-size: 14px;
+  color: rgba(255,255,255,0.7); transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.nav-item:hover { background: var(--sidebar-hover); color: #fff; }
+.nav-item.active { background: var(--sidebar-active); color: #fff; border-left-color: var(--primary); }
+.nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
+.main { flex: 1; padding: 24px; overflow-y: auto; max-width: 1000px; }
+.tab { display: none; }
+.tab.active { display: block; }
+.tab h2 { font-size: 20px; margin-bottom: 6px; }
+.tab p.desc { color: var(--text-light); font-size: 13px; margin-bottom: 20px; }
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px; }
+.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--text-light); }
+input, select, textarea {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 14px; font-family: inherit; transition: border-color 0.15s;
+  background: #fff; color: var(--text);
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(52,152,219,0.15); }
+textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas, monospace; font-size: 13px; }
+.form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.form-row > * { flex: 1; }
+.form-group { margin-bottom: 12px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
+  border: none; border-radius: 6px; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover:not(:disabled) { background: #219a52; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #c0392b; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover:not(:disabled) { background: var(--bg); }
+.result-box {
+  margin-top: 12px; padding: 12px; border-radius: 6px;
+  font-family: "SF Mono", Consolas, monospace; font-size: 13px;
+  white-space: pre-wrap; word-break: break-all;
+  max-height: 400px; overflow: auto;
+}
+.result-box.success { background: #eafaf1; border: 1px solid #d5f5e3; }
+.result-box.error { background: #fdedec; border: 1px solid #fadbd8; }
+.result-box.info { background: #ebf5fb; border: 1px solid #d6eaf8; }
+.result-box .key { color: var(--primary); }
+.result-box .string { color: var(--success); }
+.result-box .number { color: var(--warning); }
+.result-box .bool { color: var(--danger); }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.status-dot.online { background: var(--success); }
+.status-dot.offline { background: var(--danger); }
+.checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .checkbox-row input[type="checkbox"] { width: auto; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        /* 新增样式 */
+        .file-browser { border: 1px solid var(--border); border-radius: var(--radius); max-height: 400px; overflow-y: auto; background: var(--bg); }
+        .file-browser-header { padding: 12px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 10; }
+        .file-browser-path { flex: 1; font-family: monospace; font-size: 13px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
+        .file-list { list-style: none; }
+        .file-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; transition: background 0.15s; }
+        .file-item:hover { background: rgba(0, 0, 0, 0.03); }
+        .file-item.selected { background: rgba(52, 152, 219, 0.1); }
+        .file-icon { width: 24px; text-align: center; font-size: 18px; }
+        .file-name { flex: 1; font-size: 14px; }
+        .file-size { color: var(--text-light); font-size: 12px; }
+        .scan-results { max-height: 300px; overflow-y: auto; }
+        .scan-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+        .group-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #eef2f7; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); cursor: pointer; user-select: none; }
+        .group-header:hover { background: #e2e8f0; }
+        .group-toggle { font-size: 10px; width: 16px; text-align: center; transition: transform 0.15s; }
+        .group-toggle.collapsed { transform: rotate(-90deg); }
+        .group-files { overflow: hidden; transition: max-height 0.2s; }
+        .group-files.collapsed { max-height: 0 !important; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: var(--radius); width: 90%; max-width: 700px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-title { font-size: 18px; font-weight: 600; margin: 0; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light); }
+        .modal-body { padding: 20px; flex: 1; overflow: auto; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+        .selected-count { color: var(--text-light); font-size: 13px; }
+        .toggle-row { margin-bottom: 8px; }
+        .toggle-label { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .toggle-label span { font-size: 14px; font-weight: 500; color: var(--text); }
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 24px; transition: 0.3s; }
+        .toggle-slider::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle-switch input:checked + .toggle-slider { background: var(--success); }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); }
+        .config-option-group { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .completion-modal-content { max-width: 480px; text-align: center; }
+        .completion-summary { font-size: 48px; margin: 16px 0; }
+        .completion-stats { display: flex; justify-content: center; gap: 32px; margin: 16px 0; }
+        .completion-stat { text-align: center; }
+        .completion-stat-value { font-size: 28px; font-weight: 700; }
+        .completion-stat-label { font-size: 13px; color: var(--text-light); }
+        .completion-stat.success .completion-stat-value { color: var(--success); }
+        .completion-stat.failed .completion-stat-value { color: var(--danger); }
+        .completion-stat.total .completion-stat-value { color: var(--primary); }
+        .failure-log-item { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .failure-log-item:last-child { border-bottom: none; }
+        .failure-log-filename { font-weight: 600; color: var(--danger); }
+        .failure-log-detail { color: var(--text-light); font-size: 12px; margin-top: 2px; white-space: pre-wrap; word-break: break-all; }
+        .password-wrapper { position: relative; display: flex; align-items: center; }
+        .password-wrapper input { flex: 1; padding-right: 40px; }
+        .password-toggle { position: absolute; right: 8px; background: none; border: none; cursor: pointer; padding: 4px; color: var(--text-light); font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+        .password-toggle:hover { color: var(--text); }
+        .masked-placeholder { color: var(--text-light); letter-spacing: 2px; }
+        @media (max-width: 720px) {
+  .sidebar { width: 56px; }
+  .sidebar-header h1, .sidebar-header .mode-badge, .nav-item span { display: none; }
+  .nav-item { justify-content: center; padding: 12px; }
+  .nav-item .icon { font-size: 20px; width: auto; }
+  .main { padding: 16px; }
+  .form-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>Media Renamer</h1>
+    <span class="mode-badge" id="modeBadge">local</span>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" data-tab="scrape">
+      <span class="icon">📦</span><span>识别 & 刮削</span>
+    </div>
+    <div class="nav-item" data-tab="config">
+      <span class="icon">⚙️</span><span>配置</span>
+    </div>
+    <div class="nav-item" data-tab="about">
+      <span class="icon">ℹ️</span><span>关于</span>
+    </div>
+  </nav>
+  <div style="padding:12px 16px;font-size:12px;color:rgba(255,255,255,0.4)">
+    <span class="status-dot online" id="statusDot"></span><span id="statusText">检查中...</span>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ===== 识别 & 刮削 ===== -->
+<div class="tab active" id="tab-scrape">
+  <h2>📦 识别 & 刮削</h2>
+  <p class="desc">识别媒体文件信息，并刮削 NFO 元数据和图片到本地</p>
+  <div id="scrapeModeWarning" class="result-box error" style="display:none">远程模式下不可用</div>
+
+  <div class="card">
+    <h3>单文件识别测试</h3>
+    <p class="desc" style="font-size:12px;color:var(--text-light)">测试单个文件的识别结果，不写入任何文件</p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>文件路径</label>
+            <input type="text" id="testRecogPath" placeholder="/media/file.mkv">
+        </div>
+        <div class="form-group">
+            <label>文件名</label>
+            <input type="text" id="testRecogName" placeholder="file.mkv">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>数据源</label>
+            <select id="testRecogSource">
+                <option value="siliconflow_tmdb">TMDb</option>
+                <option value="bgm">Bangumi</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>媒体类型（可选）</label>
+            <select id="testRecogType">
+                <option value="">自动</option>
+                <option value="tv">剧集</option>
+                <option value="movie">电影</option>
+            </select>
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-primary" onclick="testRecognize()">识别测试</button>
+        <button class="btn btn-outline" id="btnSelectFileForTest">选择文件</button>
+    </div>
+    <div id="testRecogResult" class="result-box info" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <h3>刮削单个文件</h3>
+    <p class="desc" style="font-size:12px;color:var(--text-light)">根据配置自动写入 NFO、海报等文件到媒体目录</p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>文件路径</label>
+            <input type="text" id="scrapePath" placeholder="/media/file.mkv">
+        </div>
+        <div class="form-group">
+            <label>文件名</label>
+            <input type="text" id="scrapeName" placeholder="file.mkv">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>数据源</label>
+            <select id="scrapeSource">
+                <option value="siliconflow_tmdb">TMDb</option>
+                <option value="bgm">Bangumi</option>
+            </select>
+        </div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-success" onclick="scrapeMedia()">刮削</button>
+        <button class="btn btn-outline" id="btnSelectFileForScrape">选择文件</button>
+    </div>
+    <div id="scrapeResult" class="result-box info" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <h3>批量刮削</h3>
+    <p class="desc" style="font-size:12px;color:var(--text-light)">根据配置自动写入 NFO、海报等文件到各媒体目录</p>
+    <div class="form-group" id="manualScrapeInput">
+        <label>文件列表（JSON 格式）</label>
+        <textarea id="batchScrapeInput" rows="4" placeholder='[{"path":"/media/file.mkv","name":"file.mkv"}]'></textarea>
+    </div>
+    <div class="form-group" id="scannedScrapeFilesSection" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label>已选择的文件</label>
+            <span class="selected-count" id="scannedScrapeFilesCount">已选择 0 个文件</span>
+        </div>
+        <div id="scannedScrapeFilesList" class="scan-results"></div>
+    </div>
+    <div class="actions">
+        <button class="btn btn-success" id="batchScrapeBtn" onclick="batchScrape()">批量刮削</button>
+        <button class="btn btn-danger" id="stopScrapeBtn" onclick="stopBatchScrape()" style="display:none">停止刮削</button>
+        <button class="btn btn-outline" id="btnSelectDirectoryForScrape">选择目录</button>
+        <button class="btn btn-outline" id="btnClearScrapeSelection" style="display: none;">清空选择</button>
+    </div>
+    <div id="batchScrapeResult" class="result-box info" style="display:none"></div>
+  </div>
+</div>
+
+<!-- ===== 配置 ===== -->
+<div class="tab" id="tab-config">
+  <h2>⚙️ 配置管理</h2>
+  <p class="desc">管理 API 密钥和查看当前配置</p>
+
+  <div class="card">
+    <h3>当前配置</h3>
+    <button class="btn btn-outline" onclick="loadConfig()" style="margin-bottom:12px">刷新</button>
+    <div id="configDisplay" class="result-box info" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <h3>更新 API 密钥</h3>
+    <div class="form-group">
+      <label>TMDb API Key</label>
+      <div class="password-wrapper">
+        <input type="password" id="configTmdb" placeholder="输入 TMDb API Key" autocomplete="off">
+        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('configTmdb', this)" title="显示/隐藏">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Bangumi API Key</label>
+      <div class="password-wrapper">
+        <input type="password" id="configBgm" placeholder="输入 Bangumi API Key" autocomplete="off">
+        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('configBgm', this)" title="显示/隐藏">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>AI API Key <span style="color:var(--text-light);font-weight:400">（OpenAI 兼容，用于 AI 从目录推断剧名）</span></label>
+      <div class="password-wrapper">
+        <input type="password" id="configAiKey" placeholder="输入 AI API Key" autocomplete="off">
+        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('configAiKey', this)" title="显示/隐藏">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>AI API 地址</label>
+      <input type="text" id="configAiUrl" placeholder="https://api.deepseek.com">
+    </div>
+    <div class="form-group">
+      <label>AI 模型</label>
+      <input type="text" id="configAiModel" placeholder="deepseek-v4-pro">
+    </div>
+    <div class="form-group">
+      <label>单次调用 Token 上限 <span style="color:var(--text-light);font-weight:400">（DeepSeek 推理模型建议 500+）</span></label>
+      <input type="number" id="configAiMaxTokens" placeholder="10000" min="64" step="1">
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="updateConfig()">保存</button>
+      <button class="btn btn-outline" onclick="clearCache()">清除缓存</button>
+    </div>
+    <div id="configResult" class="result-box info" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <h3>刮削设置</h3>
+    <div class="form-group">
+      <div class="toggle-row">
+        <label class="toggle-label">
+          <span>自动写入刮削数据</span>
+          <div class="toggle-switch">
+            <input type="checkbox" id="autoWriteToggle" onchange="onAutoWriteToggle()">
+            <span class="toggle-slider"></span>
+          </div>
+        </label>
+      </div>
+      <p style="font-size:12px;color:var(--text-light);margin-top:4px">关闭时刮削仅执行识别，不写入 NFO 和图片文件</p>
+    </div>
+    <div id="autoWriteOptions" class="config-option-group" style="display:none">
+      <div class="checkbox-row">
+        <input type="checkbox" id="autoWriteNfo" checked onchange="saveAutoWriteConfig()">
+        <label style="margin:0">写入 NFO 元数据文件</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="autoWritePoster" checked onchange="saveAutoWriteConfig()">
+        <label style="margin:0">下载海报图片 (poster.jpg)</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="autoWriteFanart" checked onchange="saveAutoWriteConfig()">
+        <label style="margin:0">下载剧照/背景图 (fanart.jpg / -thumb.jpg)</label>
+      </div>
+      <p style="font-size:12px;color:var(--text-light);margin-top:8px">刮削时将根据以上选项自动写入对应的文件</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 关于 ===== -->
+<div class="tab" id="tab-about">
+  <h2>ℹ️ 关于</h2>
+  <p class="desc">服务信息</p>
+  <div class="card">
+    <div id="aboutInfo" class="result-box info" style="display:none"></div>
+  </div>
+</div>
+</div>
+
+<!-- 文件浏览器模态框 -->
+<div class="modal" id="fileBrowserModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="fileBrowserTitle">选择文件</h3>
+            <button class="modal-close" onclick="closeFileBrowser()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="file-browser">
+                <div class="file-browser-header">
+                    <button class="btn btn-outline" id="btnParentDir" onclick="goToParent()" style="padding: 6px 12px;">上一级</button>
+                    <input type="text" class="file-browser-path" id="currentPath" readonly>
+                </div>
+                <ul class="file-list" id="fileList"></ul>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeFileBrowser()">取消</button>
+            <button class="btn btn-primary" id="btnConfirmSelection" onclick="confirmSelection()">确认选择</button>
+        </div>
+    </div>
+</div>
+
+<!-- 完成弹窗 -->
+<div class="modal" id="completionModal">
+    <div class="modal-content completion-modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="completionTitle">操作完成</h3>
+            <button class="modal-close" onclick="closeCompletionModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="completion-summary" id="completionSummary">✅</div>
+            <div class="completion-stats">
+                <div class="completion-stat total">
+                    <div class="completion-stat-value" id="completionTotal">0</div>
+                    <div class="completion-stat-label">总计</div>
+                </div>
+                <div class="completion-stat success">
+                    <div class="completion-stat-value" id="completionSuccess">0</div>
+                    <div class="completion-stat-label">成功</div>
+                </div>
+                <div class="completion-stat failed">
+                    <div class="completion-stat-value" id="completionFailed">0</div>
+                    <div class="completion-stat-label">失败</div>
+                </div>
+            </div>
+            <div id="completionDetails" style="font-size:13px;color:var(--text-light);margin-top:8px"></div>
+            <div id="completionFailureBtnArea" style="display:none;margin-top:16px">
+                <button class="btn btn-danger" onclick="viewFailureLog()">查看失败日志</button>
+                <button class="btn btn-outline" onclick="downloadFailureLog()">下载失败日志</button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="closeCompletionModal()">确定</button>
+        </div>
+    </div>
+</div>
+
+<!-- 失败日志弹窗 -->
+<div class="modal" id="failureLogModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">失败日志</h3>
+            <button class="modal-close" onclick="closeFailureLogModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="failureLogBody"></div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="downloadFailureLog()">下载日志</button>
+            <button class="btn btn-primary" onclick="closeFailureLogModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const BASE = "";
+
+// 全局状态
+let currentBrowserPath = "";
+let currentParentPath = null;
+let fileBrowserMode = "file"; // "file" | "directory"
+let selectedFile = null;
+let scannedScrapeFiles = [];
+let selectionCallback = null;
+
+// Tab switching
+document.querySelectorAll(".nav-item").forEach(item => {
+  item.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    item.classList.add("active");
+    document.getElementById("tab-" + item.dataset.tab).classList.add("active");
+    if (item.dataset.tab === "config") loadConfig();
+  });
+});
+
+async function api(path, opts = {}) {
+  const url = BASE + path;
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json", ...opts.headers },
+    ...opts,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+  return data;
+}
+
+function show(el, data, type = "info") {
+  el.style.display = "block";
+  el.className = "result-box " + type;
+  if (typeof data === "string") {
+    el.textContent = data;
+  } else {
+    el.textContent = JSON.stringify(data, null, 2);
+  }
+}
+
+function hide(el) { el.style.display = "none"; }
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+  if (!bytes) return "-";
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+}
+
+// 文件浏览器相关函数
+async function browseDirectory(path = null) {
+  try {
+    const query = path ? `?path=${encodeURIComponent(path)}` : "";
+    const data = await api(`/api/v1/filesystem/browse${query}`);
+    currentBrowserPath = data.current_path;
+    currentParentPath = data.parent_path;
+    document.getElementById("currentPath").value = data.current_path;
+    document.getElementById("btnParentDir").style.display = data.parent_path ? "inline-flex" : "none";
+    
+    const fileList = document.getElementById("fileList");
+    fileList.innerHTML = "";
+    
+    data.items.forEach(item => {
+      const li = document.createElement("li");
+      li.className = "file-item";
+      if (selectedFile && selectedFile.path === item.path) {
+        li.classList.add("selected");
+      }
+      
+      li.innerHTML = `
+        <span class="file-icon">${item.is_dir ? "📁" : "📄"}</span>
+        <span class="file-name">${item.name}</span>
+        <span class="file-size">${item.is_dir ? "" : formatFileSize(item.size)}</span>
+      `;
+      
+      li.addEventListener("click", () => handleFileItemClick(item));
+      fileList.appendChild(li);
+    });
+  } catch (e) {
+    console.error("浏览目录失败:", e);
+    alert(`浏览目录失败: ${e.message}`);
+  }
+}
+
+function handleFileItemClick(item) {
+  if (item.is_dir) {
+    browseDirectory(item.path);
+    selectedFile = null;
+  } else {
+    if (fileBrowserMode === "file") {
+      selectedFile = item;
+      browseDirectory(currentBrowserPath); // 刷新显示选中状态
+    }
+  }
+}
+
+function goToParent() {
+  if (currentParentPath !== null) {
+    browseDirectory(currentParentPath);
+  } else {
+    browseDirectory(null); // 返回根目录
+  }
+}
+
+function openFileBrowser(mode, title, callback) {
+  fileBrowserMode = mode;
+  document.getElementById("fileBrowserTitle").textContent = title;
+  document.getElementById("fileBrowserModal").classList.add("active");
+  selectedFile = null;
+  browseDirectory();
+  selectionCallback = callback;
+}
+
+function closeFileBrowser() {
+  document.getElementById("fileBrowserModal").classList.remove("active");
+  selectionCallback = null;
+  selectedFile = null;
+}
+
+function confirmSelection() {
+  if (fileBrowserMode === "file" && selectedFile) {
+    if (selectionCallback) selectionCallback(selectedFile);
+    closeFileBrowser();
+  } else if (fileBrowserMode === "directory" && currentBrowserPath) {
+    scanDirectory(currentBrowserPath, true);
+    closeFileBrowser();
+  } else {
+    alert("请选择文件或目录");
+  }
+}
+
+// 扫描目录获取媒体文件
+async function scanDirectory(path, append = false) {
+  const targetEl = document.getElementById("manualScrapeInput");
+
+  const originalContent = targetEl.innerHTML;
+  targetEl.innerHTML = `
+    <div style="padding: 12px; background: #f0f4f8; border-radius: 8px;">
+      <div style="font-weight: 600; color: #2c3e50; margin-bottom: 8px;">正在扫描...</div>
+      <div id="scanProgressInfo" style="font-size: 13px; color: #7f8c9b;"></div>
+    </div>
+  `;
+
+  const progressEl = document.getElementById("scanProgressInfo");
+
+  try {
+    const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(path)}&recursive=true`, {
+      method: "POST"
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let mediaFiles = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const data = JSON.parse(line);
+          if (data.type === "progress") {
+            if (progressEl) {
+              progressEl.textContent = `已扫描 ${data.scanned_dirs} 个目录，找到 ${data.found_files} 个媒体文件 - ${data.current_path.split("/").pop() || data.current_path}`;
+            }
+          } else if (data.type === "complete") {
+            mediaFiles = data.media_files;
+            if (progressEl) progressEl.textContent = `完成！共找到 ${data.total_count} 个媒体文件`;
+          } else if (data.type === "error") {
+            throw new Error(data.message);
+          }
+        } catch (e) {
+          if (e.message !== "Unexpected end of JSON input") throw e;
+        }
+      }
+    }
+
+    setTimeout(() => {
+      targetEl.innerHTML = originalContent;
+      const newFiles = mediaFiles.map(f => ({ path: f.path, name: f.name, size: f.size, groupId: f.group_id }));
+      if (append) {
+        const existingPaths = new Set(scannedScrapeFiles.map(f => f.path));
+        for (const f of newFiles) {
+          if (!existingPaths.has(f.path)) {
+            scannedScrapeFiles.push(f);
+            existingPaths.add(f.path);
+          }
+        }
+      } else {
+        scannedScrapeFiles = newFiles;
+      }
+      updateScannedScrapeFilesDisplay();
+
+      if (mediaFiles.length === 0) {
+        alert("未找到任何媒体文件");
+      }
+    }, 300);
+
+  } catch (e) {
+    targetEl.innerHTML = originalContent;
+    console.error("扫描失败:", e);
+    alert(`扫描失败: ${e.message}`);
+  }
+}
+
+let _groupCollapseState = {};
+
+function toggleGroup(encodedGid) {
+  const gid = decodeURIComponent(encodedGid);
+  _groupCollapseState[gid] = !_groupCollapseState[gid];
+  updateScannedScrapeFilesDisplay();
+}
+
+function collapseAllGroups() {
+  for (const gid in _groupCollapseState) {
+    _groupCollapseState[gid] = true;
+  }
+  updateScannedScrapeFilesDisplay();
+}
+
+function expandAllGroups() {
+  for (const gid in _groupCollapseState) {
+    _groupCollapseState[gid] = false;
+  }
+  updateScannedScrapeFilesDisplay();
+}
+
+function removeGroup(encodedGid) {
+  const gid = decodeURIComponent(encodedGid);
+  scannedScrapeFiles = scannedScrapeFiles.filter(f => (f.groupId || "__ungrouped__") !== gid);
+  delete _groupCollapseState[gid];
+  updateScannedScrapeFilesDisplay();
+}
+
+function updateScannedScrapeFilesDisplay() {
+  const section = document.getElementById("scannedScrapeFilesSection");
+  const manualInput = document.getElementById("manualScrapeInput");
+  const listEl = document.getElementById("scannedScrapeFilesList");
+  const countEl = document.getElementById("scannedScrapeFilesCount");
+  const clearBtn = document.getElementById("btnClearScrapeSelection");
+  
+  if (scannedScrapeFiles.length > 0) {
+    section.style.display = "block";
+    manualInput.style.display = "none";
+    clearBtn.style.display = "inline-flex";
+    countEl.textContent = `已选择 ${scannedScrapeFiles.length} 个文件`;
+    
+    // 按 groupId 分组
+    const groups = {};
+    for (const file of scannedScrapeFiles) {
+      const gid = file.groupId || "__ungrouped__";
+      if (!groups[gid]) groups[gid] = { name: gid === "__ungrouped__" ? "其他" : gid.split("/").pop() || gid, files: [] };
+      groups[gid].files.push(file);
+    }
+    
+    const groupNames = Object.keys(groups).sort();
+    
+    // 初始化/清理折叠状态
+    for (const gid of groupNames) {
+      if (!(gid in _groupCollapseState)) {
+        _groupCollapseState[gid] = true;
+      }
+    }
+    for (const gid of Object.keys(_groupCollapseState)) {
+      if (!groups[gid]) delete _groupCollapseState[gid];
+    }
+    
+    const allCollapsed = groupNames.every(gid => _groupCollapseState[gid]);
+    const allExpanded = groupNames.every(gid => !_groupCollapseState[gid]);
+    
+    let html = `<div style="display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border);">
+      <button class="btn btn-outline" style="font-size:12px;padding:4px 10px" onclick="collapseAllGroups()"${allCollapsed ? ' disabled' : ''}>全部收起</button>
+      <button class="btn btn-outline" style="font-size:12px;padding:4px 10px" onclick="expandAllGroups()"${allExpanded ? ' disabled' : ''}>全部展开</button>
+    </div>`;
+    
+    for (const gid of groupNames) {
+      const group = groups[gid];
+      const showName = group.name;
+      const count = group.files.length;
+      const isCollapsed = _groupCollapseState[gid];
+      html += `<div class="group-header">
+        <span style="flex:1;display:flex;align-items:center;gap:8px;" onclick="toggleGroup('${encodeURIComponent(gid)}')">
+          <span class="group-toggle${isCollapsed ? ' collapsed' : ''}">▼</span>
+          📁 ${showName} <span style="color:var(--text-light);font-size:12px">${count} 个文件</span>
+        </span>
+        <button class="btn btn-outline" style="font-size:11px;padding:2px 8px;color:#e74c3c;border-color:#e74c3c;" onclick="event.stopPropagation();removeGroup('${encodeURIComponent(gid)}')">✕</button>
+      </div>`;
+      html += `<div class="group-files${isCollapsed ? ' collapsed' : ''}" style="max-height:${isCollapsed ? '0' : (count * 42 + 'px')}">`;
+      html += group.files.map(file => `
+        <div class="scan-item">
+          <span>📄</span>
+          <span style="flex:1">${file.name}</span>
+          <span style="color:var(--text-light);font-size:12px">${formatFileSize(file.size)}</span>
+        </div>
+      `).join("");
+      html += `</div>`;
+    }
+    
+    listEl.innerHTML = html;
+  } else {
+    section.style.display = "none";
+    manualInput.style.display = "block";
+    clearBtn.style.display = "none";
+  }
+}
+
+// 事件绑定
+document.getElementById("btnSelectFileForTest").addEventListener("click", () => {
+  openFileBrowser("file", "选择媒体文件", (file) => {
+    document.getElementById("testRecogPath").value = file.path;
+    document.getElementById("testRecogName").value = file.name;
+  });
+});
+
+document.getElementById("btnSelectFileForScrape").addEventListener("click", () => {
+  openFileBrowser("file", "选择媒体文件", (file) => {
+    document.getElementById("scrapePath").value = file.path;
+    document.getElementById("scrapeName").value = file.name;
+  });
+});
+
+document.getElementById("btnSelectDirectoryForScrape").addEventListener("click", () => {
+  openFileBrowser("directory", "选择目录扫描媒体文件", null);
+});
+
+document.getElementById("btnClearScrapeSelection").addEventListener("click", () => {
+  if (_scrapeAbortController) {
+    _scrapeAbortController.abort();
+  }
+  scannedScrapeFiles = [];
+  updateScannedScrapeFilesDisplay();
+  const resultEl = document.getElementById("batchScrapeResult");
+  resultEl.style.display = "none";
+  resultEl.innerHTML = "";
+});
+
+// === Health & Status ===
+async function checkHealth() {
+  try {
+    const data = await api("/health");
+    document.getElementById("statusText").textContent = "在线";
+    document.getElementById("statusDot").className = "status-dot online";
+  } catch {
+    document.getElementById("statusText").textContent = "离线";
+    document.getElementById("statusDot").className = "status-dot offline";
+  }
+}
+
+async function loadRoot() {
+  try {
+    const data = await api("/");
+    const badge = document.getElementById("modeBadge");
+    badge.textContent = data.mode || "local";
+    if (data.mode === "remote") {
+      badge.className = "mode-badge remote";
+      document.getElementById("scrapeModeWarning").style.display = "block";
+    }
+    return data;
+  } catch { return {}; }
+}
+
+async function loadAbout() {
+  try {
+    const data = await api("/");
+    show(document.getElementById("aboutInfo"), data, "info");
+  } catch {}
+}
+
+// === 自动写入配置 ===
+function loadAutoWriteConfig() {
+  try {
+    const enabled = localStorage.getItem("autoWriteEnabled") !== "false";
+    const writeNfo = localStorage.getItem("autoWriteNfo") !== "false";
+    const writePoster = localStorage.getItem("autoWritePoster") !== "false";
+    const writeFanart = localStorage.getItem("autoWriteFanart") !== "false";
+    
+    document.getElementById("autoWriteToggle").checked = enabled;
+    document.getElementById("autoWriteNfo").checked = writeNfo;
+    document.getElementById("autoWritePoster").checked = writePoster;
+    document.getElementById("autoWriteFanart").checked = writeFanart;
+    
+    document.getElementById("autoWriteOptions").style.display = enabled ? "block" : "none";
+  } catch (e) {
+    console.error("加载配置失败:", e);
+  }
+}
+
+function saveAutoWriteConfig() {
+  try {
+    localStorage.setItem("autoWriteEnabled", document.getElementById("autoWriteToggle").checked);
+    localStorage.setItem("autoWriteNfo", document.getElementById("autoWriteNfo").checked);
+    localStorage.setItem("autoWritePoster", document.getElementById("autoWritePoster").checked);
+    localStorage.setItem("autoWriteFanart", document.getElementById("autoWriteFanart").checked);
+  } catch (e) {
+    console.error("保存配置失败:", e);
+  }
+}
+
+function onAutoWriteToggle() {
+  const enabled = document.getElementById("autoWriteToggle").checked;
+  document.getElementById("autoWriteOptions").style.display = enabled ? "block" : "none";
+  saveAutoWriteConfig();
+}
+
+function getScrapeOptions() {
+  const enabled = document.getElementById("autoWriteToggle").checked;
+  return {
+    download_images: enabled && document.getElementById("autoWritePoster").checked,
+    write_nfo: enabled && document.getElementById("autoWriteNfo").checked,
+    download_fanart: enabled && document.getElementById("autoWriteFanart").checked,
+  };
+}
+
+// === 失败日志 ===
+let lastFailureLogs = [];
+
+function viewFailureLog() {
+  const body = document.getElementById("failureLogBody");
+  if (lastFailureLogs.length === 0) {
+    body.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-light);">没有失败记录</div>';
+  } else {
+    body.innerHTML = lastFailureLogs.map(item => `
+      <div class="failure-log-item">
+        <div class="failure-log-filename">${escapeHtml(item.name || item.path || "未知")}</div>
+        <div class="failure-log-detail">${escapeHtml(item.detail || item.status || "未知错误")}</div>
+      </div>
+    `).join("");
+  }
+  document.getElementById("failureLogModal").classList.add("active");
+}
+
+function closeFailureLogModal() {
+  document.getElementById("failureLogModal").classList.remove("active");
+}
+
+function downloadFailureLog() {
+  if (lastFailureLogs.length === 0) {
+    alert("没有失败记录可下载");
+    return;
+  }
+  const lines = lastFailureLogs.map(item => {
+    const name = item.name || item.path || "未知";
+    const detail = item.detail || item.status || "未知错误";
+    return `[失败] ${name}\n  原因: ${detail}\n`;
+  });
+  const content = `失败日志 - ${new Date().toLocaleString("zh-CN")}\n${"=".repeat(50)}\n\n${lines.join("\n")}`;
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `scrape-failures-${new Date().toISOString().slice(0, 10)}.log`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// === 完成弹窗 ===
+let _completionFailedItems = [];
+
+function showCompletionModal(title, total, success, failed, failedItems) {
+  document.getElementById("completionTitle").textContent = title;
+  document.getElementById("completionTotal").textContent = total;
+  document.getElementById("completionSuccess").textContent = success;
+  document.getElementById("completionFailed").textContent = failed;
+  
+  const summaryEl = document.getElementById("completionSummary");
+  if (failed === 0) {
+    summaryEl.textContent = "✅";
+    document.getElementById("completionDetails").textContent = "全部操作成功完成！";
+  } else if (success === 0) {
+    summaryEl.textContent = "❌";
+    document.getElementById("completionDetails").textContent = "所有操作均失败，请查看失败日志了解详情";
+  } else {
+    summaryEl.textContent = "⚠️";
+    document.getElementById("completionDetails").textContent = `部分操作失败 (${failed}/${total})，请查看失败日志了解详情`;
+  }
+  
+  _completionFailedItems = failedItems || [];
+  lastFailureLogs = failedItems || [];
+  
+  document.getElementById("completionFailureBtnArea").style.display = failed > 0 ? "block" : "none";
+  document.getElementById("completionModal").classList.add("active");
+}
+
+function closeCompletionModal() {
+  document.getElementById("completionModal").classList.remove("active");
+}
+
+// === 单文件识别测试 ===
+async function testRecognize() {
+  const el = document.getElementById("testRecogResult");
+  const filename = document.getElementById("testRecogName").value.trim();
+  const filepath = document.getElementById("testRecogPath").value.trim();
+  
+  if (!filename) { show(el, "请输入文件名", "error"); return; }
+  
+  const body = {
+    filename,
+    filepath: filepath || undefined,
+    source: document.getElementById("testRecogSource").value,
+    media_type_override: document.getElementById("testRecogType").value || undefined,
+  };
+  
+  try {
+    el.style.display = "block";
+    el.className = "result-box info";
+    el.textContent = "正在识别...";
+    
+    const data = await api("/api/v1/recognition/recognize", {
+      method: "POST", body: JSON.stringify(body),
+    });
+    
+    if (data.success) {
+      show(el, data, "success");
+    } else {
+      show(el, data, "error");
+    }
+  } catch (e) {
+    show(el, e.message, "error");
+  }
+}
+
+// === Scrape ===
+let _scrapeAbortController = null;
+
+async function scrapeMedia() {
+  const el = document.getElementById("scrapeResult");
+  const path = document.getElementById("scrapePath").value.trim();
+  const name = document.getElementById("scrapeName").value.trim();
+  if (!path || !name) { show(el, "请输入文件路径和文件名", "error"); return; }
+  
+  const opts = getScrapeOptions();
+  
+  try {
+    const data = await api("/api/v1/media/scrape", {
+      method: "POST", body: JSON.stringify({
+        files: [{ path, name }],
+        source: document.getElementById("scrapeSource").value,
+        download_images: opts.download_images || opts.download_fanart,
+        write_nfo: opts.write_nfo,
+      }),
+    });
+    show(el, data, "success");
+  } catch (e) {
+    show(el, e.message, "error");
+  }
+}
+
+async function batchScrape() {
+  const el = document.getElementById("batchScrapeResult");
+  el.style.display = "block";
+  el.className = "result-box info";
+  el.innerHTML = '<div style="margin-bottom: 8px; font-weight: 600;">正在刮削...</div><div id="scrapeProgress" style="color: #7f8c9b; font-size: 13px;"></div><div id="scrapeLogs" style="margin-top: 12px; font-size: 13px; line-height: 1.6;"></div><div id="scrapeTokenUsage" style="margin-top: 8px; font-size: 12px;"></div>';
+  
+  const progressEl = document.getElementById("scrapeProgress");
+  const logsEl = document.getElementById("scrapeLogs");
+  const tokenUsageEl = document.getElementById("scrapeTokenUsage");
+  
+  document.getElementById("batchScrapeBtn").style.display = "none";
+  document.getElementById("stopScrapeBtn").style.display = "inline-flex";
+  
+  _scrapeAbortController = new AbortController();
+  
+  const opts = getScrapeOptions();
+  const autoWriteEnabled = document.getElementById("autoWriteToggle").checked;
+  
+  let successCount = 0;
+  let failedCount = 0;
+  let completedCount = 0;
+  let total = 0;
+  let logs = [];
+  let failedItems = [];
+
+  try {
+    let files;
+    if (scannedScrapeFiles.length > 0) {
+      files = scannedScrapeFiles.map(f => ({ path: f.path, name: f.name, group_id: f.groupId }));
+    } else {
+      const input = document.getElementById("batchScrapeInput").value.trim();
+      if (!input) { show(el, "请输入文件列表 JSON", "error"); return; }
+      files = JSON.parse(input);
+    }
+    
+    if (!Array.isArray(files) || files.length === 0) throw new Error("需要非空数组");
+    
+    const response = await fetch("/api/v1/media/scrape/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        files,
+        source: document.getElementById("scrapeSource").value,
+        download_images: opts.download_images || opts.download_fanart,
+        write_nfo: opts.write_nfo
+      }),
+      signal: _scrapeAbortController.signal
+    });
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        
+        try {
+          const data = JSON.parse(line);
+          
+          if (data.type === "result") {
+            total = data.total;
+            completedCount++;
+            
+            progressEl.textContent = `进度: ${completedCount}/${total}`;
+            
+            const filename = data.data.original_name || data.data.original_path?.split("/").pop() || "未知";
+            const status = data.data.status || "";
+            
+            if (data.success) {
+              successCount++;
+              const title = data.data.recognized_title || "未识别";
+              if (!autoWriteEnabled) {
+                logs.push(`✅ ${filename} → ${title} (未开启文件下载)`);
+              } else {
+                const nfoCount = data.data.nfo_written?.length || 0;
+                const imgCount = data.data.images_downloaded?.length || 0;
+                logs.push(`✅ ${filename} → ${title} (${nfoCount} NFO, ${imgCount} 图片)`);
+              }
+            } else {
+              failedCount++;
+              const errors = data.data.errors || [status];
+              const detail = errors.join("; ");
+              logs.push(`❌ ${filename}: ${detail}`);
+              failedItems.push({
+                name: filename,
+                path: data.data.original_path || "",
+                status: detail,
+                detail: detail,
+              });
+            }
+            
+            if (logs.length > 20) {
+              logs = logs.slice(-20);
+            }
+            logsEl.textContent = logs.join("\n");
+            logsEl.scrollTop = logsEl.scrollHeight;
+            
+          } else if (data.type === "complete") {
+            let summary = `完成！总计: ${total}, 成功: ${successCount}, 失败: ${failedCount}`;
+            let completionDetail = "";
+            if (!autoWriteEnabled) {
+              summary += " (⚠️ 未开启文件下载)";
+              completionDetail = "⚠️ 自动写入刮削数据开关已关闭，未写入 NFO 和下载图片";
+            }
+            progressEl.textContent = summary;
+            
+            if (data.token_usage) {
+              const tu = data.token_usage;
+              tokenUsageEl.textContent = `🤖 Token: 输入 ${tu.prompt_tokens} · 输出 ${tu.completion_tokens} · 总计 ${tu.total_tokens} (${tu.calls} 次调用) · 约 ¥${tu.cost_cache_miss.toFixed(4)} (缓存未命中) / ¥${tu.cost_cache_hit.toFixed(4)} (缓存命中)`;
+              tokenUsageEl.style.color = "#8e44ad";
+            }
+            
+            if (failedCount === 0) {
+              el.className = "result-box success";
+            } else if (successCount === 0) {
+              el.className = "result-box error";
+            } else {
+              el.className = "result-box warning";
+            }
+            
+            showCompletionModal("批量刮削完成", total, successCount, failedCount, failedItems);
+            if (completionDetail) {
+              document.getElementById("completionDetails").textContent = completionDetail;
+            }
+          }
+        } catch (e) {
+          if (e.message !== "Unexpected end of JSON input") {
+            console.error("解析响应失败:", e);
+          }
+        }
+      }
+    }
+    
+  } catch (e) {
+    if (e.name === "AbortError") {
+      progressEl.textContent = `已停止 (已完成 ${completedCount} 个)`;
+      el.className = "result-box warning";
+    } else {
+      show(el, `刮削失败: ${e.message}`, "error");
+    }
+  } finally {
+    _scrapeAbortController = null;
+    document.getElementById("batchScrapeBtn").style.display = "inline-flex";
+    document.getElementById("stopScrapeBtn").style.display = "none";
+  }
+}
+
+function stopBatchScrape() {
+  if (_scrapeAbortController) {
+    _scrapeAbortController.abort();
+  }
+}
+
+// === Config ===
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === "password") {
+    input.type = "text";
+    btn.textContent = "🙈";
+  } else {
+    input.type = "password";
+    btn.textContent = "👁";
+  }
+}
+
+async function loadConfig() {
+  const el = document.getElementById("configDisplay");
+  try {
+    const data = await api("/api/v1/config");
+    const lines = [
+      `运行模式: ${data.mode}`,
+      `TMDb API Key: ${data.tmdb_api_key_set ? "✅ 已配置" : "❌ 未配置"}`,
+      `Bangumi API Key: ${data.bgm_api_key_set ? "✅ 已配置" : "❌ 未配置"}`,
+      `AI Key (剧名推断): ${data.ai_api_key_set ? "✅ 已配置" : "❌ 未配置"}`,
+      `AI API 地址: ${data.ai_base_url || "默认"}`,
+      `AI 模型: ${data.ai_model || "默认"}`,
+      `Token 上限: ${data.ai_max_tokens || 200}`,
+    ];
+    show(el, lines.join("\n"), "info");
+    if (data.ai_base_url) {
+      document.getElementById("configAiUrl").value = data.ai_base_url;
+    }
+    if (data.ai_model) {
+      document.getElementById("configAiModel").value = data.ai_model;
+    }
+    if (data.ai_max_tokens) {
+      document.getElementById("configAiMaxTokens").value = data.ai_max_tokens;
+    }
+    if (data.tmdb_api_key_set) {
+      const inp = document.getElementById("configTmdb");
+      inp.value = "";
+      inp.placeholder = "•••••••••••••••";
+      inp.dataset.masked = "true";
+    }
+    if (data.bgm_api_key_set) {
+      const inp = document.getElementById("configBgm");
+      inp.value = "";
+      inp.placeholder = "•••••••••••••••";
+      inp.dataset.masked = "true";
+    }
+    if (data.ai_api_key_set) {
+      const inp = document.getElementById("configAiKey");
+      inp.value = "";
+      inp.placeholder = "•••••••••••••••";
+      inp.dataset.masked = "true";
+    }
+  } catch (e) {
+    show(el, e.message, "error");
+  }
+}
+
+async function updateConfig() {
+  const el = document.getElementById("configResult");
+  const tmdb = getKeyValue("configTmdb");
+  const bgm = getKeyValue("configBgm");
+  const aiKey = getKeyValue("configAiKey");
+  const aiUrl = document.getElementById("configAiUrl").value.trim();
+  const aiModel = document.getElementById("configAiModel").value.trim();
+  const aiMaxTokens = document.getElementById("configAiMaxTokens").value.trim();
+  if (!tmdb && !bgm && !aiKey && !aiUrl && !aiModel && !aiMaxTokens) { show(el, "没有需要更新的配置", "info"); return; }
+  const body = {};
+  if (tmdb) body.tmdb_api_key = tmdb;
+  if (bgm) body.bgm_api_key = bgm;
+  if (aiKey) body.ai_api_key = aiKey;
+  if (aiUrl) body.ai_base_url = aiUrl;
+  if (aiModel) body.ai_model = aiModel;
+  if (aiMaxTokens) body.ai_max_tokens = parseInt(aiMaxTokens, 10);
+  try {
+    const data = await api("/api/v1/config", {
+      method: "PUT", body: JSON.stringify(body),
+    });
+    show(el, data, "success");
+    loadConfig();
+  } catch (e) {
+    show(el, e.message, "error");
+  }
+}
+
+function getKeyValue(inputId) {
+  const inp = document.getElementById(inputId);
+  const val = inp.value.trim();
+  if (inp.dataset.masked === "true" && !val) return null;
+  if (!val) return null;
+  return val;
+}
+
+async function clearCache() {
+  const el = document.getElementById("configResult");
+  try {
+    const data = await api("/api/v1/config/clear-cache", { method: "POST" });
+    show(el, data, "success");
+  } catch (e) {
+    show(el, e.message, "error");
+  }
+}
+
+// Init
+checkHealth();
+loadAutoWriteConfig();
+loadRoot().then(r => { if (r.version) loadAbout(); });
+</script>
+</body>
+</html>

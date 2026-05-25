@@ -1,0 +1,16 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+*.egg-info
+.idea
+.vscode
+*.log
+renamer_config.json
+media_renamer_config.json
+api_cache.json
+poster_sample.jpg
+.venv/
+.DS_Store
+.env
