@@ -109,6 +109,7 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
         .file-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; transition: background 0.15s; }
         .file-item:hover { background: rgba(0, 0, 0, 0.03); }
         .file-item.selected { background: rgba(52, 152, 219, 0.1); }
+        .file-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; accent-color: var(--primary); }
         .file-icon { width: 24px; text-align: center; font-size: 18px; }
         .file-name { flex: 1; font-size: 14px; }
         .file-size { color: var(--text-light); font-size: 12px; }
@@ -280,7 +281,7 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
     <div class="actions">
         <button class="btn btn-success" id="batchScrapeBtn" onclick="batchScrape()">批量刮削</button>
         <button class="btn btn-danger" id="stopScrapeBtn" onclick="stopBatchScrape()" style="display:none">停止刮削</button>
-        <button class="btn btn-outline" id="btnSelectDirectoryForScrape">选择目录</button>
+        <button class="btn btn-outline" id="btnSelectDirectoryForScrape">选择目录（可多选）</button>
         <button class="btn btn-outline" id="btnClearScrapeSelection" style="display: none;">清空选择</button>
     </div>
     <div id="batchScrapeResult" class="result-box info" style="display:none"></div>
@@ -399,6 +400,7 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
             </div>
         </div>
         <div class="modal-footer">
+            <span class="selected-count" id="selectedDirsCount"></span>
             <button class="btn btn-outline" onclick="closeFileBrowser()">取消</button>
             <button class="btn btn-primary" id="btnConfirmSelection" onclick="confirmSelection()">确认选择</button>
         </div>
@@ -463,6 +465,7 @@ let currentBrowserPath = "";
 let currentParentPath = null;
 let fileBrowserMode = "file"; // "file" | "directory"
 let selectedFile = null;
+let selectedDirs = []; // 多选目录列表
 let scannedScrapeFiles = [];
 let selectionCallback = null;
 
@@ -521,20 +524,55 @@ async function browseDirectory(path = null) {
     const fileList = document.getElementById("fileList");
     fileList.innerHTML = "";
     
+    // 清除当前目录下的选中状态（跨目录时）
+    if (fileBrowserMode === "directory") {
+      const currentDirSelected = selectedDirs.some(d => d.startsWith(data.current_path + "/") || d === data.current_path);
+      if (!currentDirSelected) {
+        selectedDirs = selectedDirs.filter(d => !d.startsWith(data.current_path));
+      }
+    }
+    
     data.items.forEach(item => {
       const li = document.createElement("li");
       li.className = "file-item";
-      if (selectedFile && selectedFile.path === item.path) {
+      const isSelected = selectedFile && selectedFile.path === item.path;
+      const isDirSelected = fileBrowserMode === "directory" && selectedDirs.includes(item.path);
+      if (isSelected || isDirSelected) {
         li.classList.add("selected");
       }
       
-      li.innerHTML = `
-        <span class="file-icon">${item.is_dir ? "📁" : "📄"}</span>
-        <span class="file-name">${item.name}</span>
-        <span class="file-size">${item.is_dir ? "" : formatFileSize(item.size)}</span>
-      `;
-      
-      li.addEventListener("click", () => handleFileItemClick(item));
+      if (item.is_dir && fileBrowserMode === "directory") {
+        li.innerHTML = `
+          <input type="checkbox" style="width:16px;height:16px;cursor:pointer;flex-shrink:0" ${isDirSelected ? "checked" : ""}>
+          <span class="file-icon">📁</span>
+          <span class="file-name">${item.name}</span>
+          <button class="btn btn-outline" style="font-size:12px;padding:2px 8px;flex-shrink:0">进入</button>
+        `;
+        const cb = li.querySelector("input[type=checkbox]");
+        const enterBtn = li.querySelector("button");
+        cb.addEventListener("click", (e) => e.stopPropagation());
+        enterBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          browseDirectory(item.path);
+        });
+        li.addEventListener("click", () => {
+          cb.checked = !cb.checked;
+          if (cb.checked) {
+            if (!selectedDirs.includes(item.path)) selectedDirs.push(item.path);
+          } else {
+            selectedDirs = selectedDirs.filter(d => d !== item.path);
+          }
+          li.classList.toggle("selected", cb.checked);
+          updateSelectedDirsCount();
+        });
+      } else {
+        li.innerHTML = `
+          <span class="file-icon">${item.is_dir ? "📁" : "📄"}</span>
+          <span class="file-name">${item.name}</span>
+          <span class="file-size">${item.is_dir ? "" : formatFileSize(item.size)}</span>
+        `;
+        li.addEventListener("click", () => handleFileItemClick(item));
+      }
       fileList.appendChild(li);
     });
   } catch (e) {
@@ -568,6 +606,8 @@ function openFileBrowser(mode, title, callback) {
   document.getElementById("fileBrowserTitle").textContent = title;
   document.getElementById("fileBrowserModal").classList.add("active");
   selectedFile = null;
+  selectedDirs = [];
+  updateSelectedDirsCount();
   browseDirectory();
   selectionCallback = callback;
 }
@@ -576,103 +616,107 @@ function closeFileBrowser() {
   document.getElementById("fileBrowserModal").classList.remove("active");
   selectionCallback = null;
   selectedFile = null;
+  selectedDirs = [];
+}
+
+function updateSelectedDirsCount() {
+  const el = document.getElementById("selectedDirsCount");
+  if (fileBrowserMode === "directory" && selectedDirs.length > 0) {
+    el.textContent = `已选择 ${selectedDirs.length} 个目录`;
+  } else {
+    el.textContent = "";
+  }
 }
 
 function confirmSelection() {
   if (fileBrowserMode === "file" && selectedFile) {
     if (selectionCallback) selectionCallback(selectedFile);
     closeFileBrowser();
-  } else if (fileBrowserMode === "directory" && currentBrowserPath) {
-    scanDirectory(currentBrowserPath, true);
+  } else if (fileBrowserMode === "directory" && selectedDirs.length > 0) {
+    scanMultipleDirectories(selectedDirs);
     closeFileBrowser();
+  } else if (fileBrowserMode === "directory") {
+    alert("请先勾选要扫描的目录");
   } else {
-    alert("请选择文件或目录");
+    alert("请选择文件");
   }
 }
 
-// 扫描目录获取媒体文件
-async function scanDirectory(path, append = false) {
+async function scanMultipleDirectories(dirList) {
   const targetEl = document.getElementById("manualScrapeInput");
-
   const originalContent = targetEl.innerHTML;
-  targetEl.innerHTML = `
-    <div style="padding: 12px; background: #f0f4f8; border-radius: 8px;">
-      <div style="font-weight: 600; color: #2c3e50; margin-bottom: 8px;">正在扫描...</div>
-      <div id="scanProgressInfo" style="font-size: 13px; color: #7f8c9b;"></div>
-    </div>
-  `;
 
-  const progressEl = document.getElementById("scanProgressInfo");
+  const allFiles = [];
+  let scannedCount = 0;
 
-  try {
-    const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(path)}&recursive=true`, {
-      method: "POST"
-    });
+  for (const dir of dirList) {
+    targetEl.innerHTML = `
+      <div style="padding: 12px; background: #f0f4f8; border-radius: 8px;">
+        <div style="font-weight: 600; color: #2c3e50; margin-bottom: 8px;">正在扫描 (${scannedCount + 1}/${dirList.length})</div>
+        <div id="scanProgressInfo" style="font-size: 13px; color: #7f8c9b;"></div>
+      </div>
+    `;
+    const progressEl = document.getElementById("scanProgressInfo");
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    try {
+      const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dir)}&recursive=true`, {
+        method: "POST"
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let mediaFiles = [];
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const data = JSON.parse(line);
-          if (data.type === "progress") {
-            if (progressEl) {
-              progressEl.textContent = `已扫描 ${data.scanned_dirs} 个目录，找到 ${data.found_files} 个媒体文件 - ${data.current_path.split("/").pop() || data.current_path}`;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line);
+            if (data.type === "complete") {
+              allFiles.push(...data.media_files.map(f => ({ path: f.path, name: f.name, size: f.size, groupId: f.group_id })));
+              if (progressEl) progressEl.textContent = `完成！${dir.split("/").pop()} 中找到 ${data.total_count} 个文件`;
+            } else if (data.type === "error") {
+              throw new Error(data.message);
             }
-          } else if (data.type === "complete") {
-            mediaFiles = data.media_files;
-            if (progressEl) progressEl.textContent = `完成！共找到 ${data.total_count} 个媒体文件`;
-          } else if (data.type === "error") {
-            throw new Error(data.message);
+          } catch (e) {
+            if (e.message !== "Unexpected end of JSON input") throw e;
           }
-        } catch (e) {
-          if (e.message !== "Unexpected end of JSON input") throw e;
         }
+      }
+    } catch (e) {
+      console.error(`扫描目录失败: ${dir}`, e);
+      if (progressEl) progressEl.textContent = `扫描失败: ${e.message}`;
+    }
+    scannedCount++;
+  }
+
+  setTimeout(() => {
+    targetEl.innerHTML = originalContent;
+    const existingPaths = new Set(scannedScrapeFiles.map(f => f.path));
+    for (const f of allFiles) {
+      if (!existingPaths.has(f.path)) {
+        scannedScrapeFiles.push(f);
+        existingPaths.add(f.path);
       }
     }
-
-    setTimeout(() => {
-      targetEl.innerHTML = originalContent;
-      const newFiles = mediaFiles.map(f => ({ path: f.path, name: f.name, size: f.size, groupId: f.group_id }));
-      if (append) {
-        const existingPaths = new Set(scannedScrapeFiles.map(f => f.path));
-        for (const f of newFiles) {
-          if (!existingPaths.has(f.path)) {
-            scannedScrapeFiles.push(f);
-            existingPaths.add(f.path);
-          }
-        }
-      } else {
-        scannedScrapeFiles = newFiles;
-      }
-      updateScannedScrapeFilesDisplay();
-
-      if (mediaFiles.length === 0) {
-        alert("未找到任何媒体文件");
-      }
-    }, 300);
-
-  } catch (e) {
-    targetEl.innerHTML = originalContent;
-    console.error("扫描失败:", e);
-    alert(`扫描失败: ${e.message}`);
-  }
+    updateScannedScrapeFilesDisplay();
+    if (allFiles.length === 0) {
+      alert("所选目录中未找到任何媒体文件");
+    }
+  }, 300);
 }
 
+// updateGroupCollapseButtons is managed within updateScannedScrapeFilesDisplay
+
 let _groupCollapseState = {};
+
+// 事件绑定
 
 function toggleGroup(encodedGid) {
   const gid = decodeURIComponent(encodedGid);

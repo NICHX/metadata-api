@@ -92,9 +92,13 @@ python main_api.py
 
 ### 方式一：GitHub Actions 自动构建
 
-每次推送至 `main` 分支或创建 `v*` 标签时，GitHub Actions 会自动构建镜像并推送到 GitHub Container Registry：
+推送 `v*` 格式的 Git 标签时，GitHub Actions 会自动构建镜像并推送到 GitHub Container Registry：
 
 ```bash
+# 推送标签触发构建
+git tag v1.0.0
+git push origin v1.0.0
+
 # 拉取最新镜像
 docker pull ghcr.io/你的GitHub用户名/metadata-api:latest
 
@@ -122,8 +126,10 @@ docker run -d \
 ### 方式三：Docker Compose
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+
+Docker Compose 会自动创建 `media-renamer-data` 卷，将配置文件和 API 缓存持久化到宿主机。
 
 ---
 
@@ -174,7 +180,9 @@ docker-compose up -d
 
 ```
 metadata-api/
-├── api/                      # FastAPI 应用
+├── .github/workflows/       # GitHub Actions CI 配置
+│   └── docker-build.yml     # Docker 镜像自动构建
+├── api/                     # FastAPI 应用
 │   ├── main.py              # 应用入口，路由注册
 │   ├── config.py            # 配置管理（环境变量、JSON 文件）
 │   ├── dependencies.py      # FastAPI 依赖（本地模式校验）
@@ -193,6 +201,9 @@ metadata-api/
 │   │   └── ai_service.py    # AI 推断服务（OpenAI 兼容）
 │   └── templates/           # Jinja2 模板
 │       └── web_ui.html      # Web UI 页面
+├── data/                    # 运行时数据卷（自动创建）
+│   ├── media_renamer_config.json  # 持久化配置文件
+│   └── api_cache.json       # API 缓存（TMDb/BGM）
 ├── db/                      # 数据源集成
 │   └── tmdb_api.py          # TMDb / Bangumi API 封装
 ├── utils/                   # 工具函数
@@ -202,8 +213,7 @@ metadata-api/
 ├── requirements.txt         # Python 依赖
 ├── Dockerfile               # Docker 构建文件
 ├── docker-compose.yml       # Docker Compose 配置
-├── docker-entrypoint.sh     # Docker 启动脚本
-└── .env.example             # 环境变量模板
+└── docker-entrypoint.sh     # Docker 启动脚本
 ```
 
 ---

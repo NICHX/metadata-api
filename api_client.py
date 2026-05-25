@@ -8,7 +8,7 @@ import json
 from typing import Optional, List
 
 # 默认服务器地址（局域网访问）
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://192.168.31.252:8000"
 
 
 class MediaRenamerClient:
