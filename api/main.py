@@ -6,7 +6,7 @@ import os
 # 确保能找到项目根目录
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api.routes import recognition, config, media_operations, web_ui, filesystem
+from api.routes import recognition, config, media_operations, web_ui, filesystem, auth
 from api.config import settings, DeploymentMode
 from api.dependencies import verify_auth
 
@@ -31,6 +31,7 @@ app.include_router(config.router, dependencies=[Depends(verify_auth)])
 app.include_router(media_operations.router, dependencies=[Depends(verify_auth)])
 app.include_router(web_ui.router)
 app.include_router(filesystem.router, dependencies=[Depends(verify_auth)])
+app.include_router(auth.router)
 
 
 @app.get("/")

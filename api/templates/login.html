@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 - Metadata API</title>
+<style>
+:root {
+  --bg: #f5f6fa;
+  --card: #ffffff;
+  --border: #e0e3e8;
+  --text: #2c3e50;
+  --text-light: #7f8c9b;
+  --primary: #3498db;
+  --primary-dark: #2980b9;
+  --danger: #e74c3c;
+  --radius: 12px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg); color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 20px;
+}
+.login-card {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 40px;
+  width: 100%; max-width: 400px;
+}
+.login-header {
+  text-align: center; margin-bottom: 32px;
+}
+.login-header h1 {
+  font-size: 22px; font-weight: 700; margin-bottom: 6px;
+}
+.login-header p {
+  font-size: 14px; color: var(--text-light);
+}
+.form-group { margin-bottom: 20px; }
+.form-group label {
+  display: block; font-size: 13px; font-weight: 500;
+  margin-bottom: 6px; color: var(--text-light);
+}
+.form-group input {
+  width: 100%; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 15px; font-family: inherit; transition: border-color 0.15s;
+  background: #fff; color: var(--text);
+}
+.form-group input:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(52,152,219,0.15);
+}
+.btn {
+  display: block; width: 100%; padding: 12px;
+  border: none; border-radius: 8px;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.error-msg {
+  margin-top: 16px; padding: 10px 14px;
+  background: #fdedec; border: 1px solid #fadbd8;
+  border-radius: 8px; color: var(--danger);
+  font-size: 14px; display: none;
+}
+.spinner {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.footer {
+  margin-top: 24px; text-align: center;
+  font-size: 12px; color: var(--text-light);
+}
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="login-header">
+    <h1>Metadata API</h1>
+    <p>请输入账号密码登录</p>
+  </div>
+  <form id="loginForm" onsubmit="handleLogin(event)">
+    <div class="form-group">
+      <label for="username">账号</label>
+      <input type="text" id="username" name="username" placeholder="输入账号" autocomplete="username" required autofocus>
+    </div>
+    <div class="form-group">
+      <label for="password">密码</label>
+      <input type="password" id="password" name="password" placeholder="输入密码" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="btn btn-primary" id="loginBtn">
+      <span id="btnText">登 录</span>
+      <span id="btnSpinner" class="spinner" style="display:none"></span>
+    </button>
+    <div class="error-msg" id="errorMsg"></div>
+  </form>
+  <div class="footer">Metadata API v1.0.0</div>
+</div>
+<script>
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const btnText = document.getElementById('btnText');
+  const btnSpinner = document.getElementById('btnSpinner');
+  const errorEl = document.getElementById('errorMsg');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+
+  if (!username || !password) {
+    showError('请输入账号和密码');
+    return;
+  }
+
+  btn.disabled = true;
+  btnText.textContent = '登录中...';
+  btnSpinner.style.display = 'inline-block';
+  errorEl.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      window.location.href = '/web-ui';
+    } else {
+      showError(data.detail || data.message || '登录失败');
+    }
+  } catch (err) {
+    showError('网络错误: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = '登 录';
+    btnSpinner.style.display = 'none';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>

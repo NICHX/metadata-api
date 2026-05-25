@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from enum import Enum
+from pydantic import Field
 import json
 import os
 
@@ -30,6 +31,10 @@ class Settings(BaseSettings):
     ai_base_url: str = "https://api.deepseek.com"
     ai_model: str = "deepseek-v4-pro"
     ai_max_tokens: int = 10000
+
+    # Web UI 登录凭证（留空则不需要登录）
+    web_username: str = Field("", validation_alias="METADATA_WEB_USERNAME")
+    web_password: str = Field("", validation_alias="METADATA_WEB_PASSWORD")
 
     class Config:
         env_prefix = "METADATA_"

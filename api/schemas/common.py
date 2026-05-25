@@ -36,3 +36,14 @@ class EpisodeMetadata(MediaMetadata):
     # 附加字段用于刮削
     type: Optional[str] = None  # episode/movie
     match_id: Optional[str] = None
+    # 分类细化字段
+    media_category: Optional[str] = None  # episode/movie/season/tvshow/collection/documentary/music_video/variety/short
+    collection_id: Optional[int] = None
+    collection_name: Optional[str] = None
+    collection_poster: Optional[str] = None
+    collection_overview: Optional[str] = None
+    tv_id: Optional[int] = None
+    season_number: Optional[int] = None
+    # 演职人员
+    actors: List[Dict[str, str]] = []
+    directors: List[str] = []

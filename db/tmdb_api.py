@@ -2,6 +2,7 @@ import logging
 import re
 import threading
 import time
+import asyncio
 import difflib
 
 import requests
@@ -490,7 +491,10 @@ def _legacy_fetch_tmdb_candidates_raw_v1(title, year=None, is_tv=True, api_key="
                     "msg": f"TMDb{'剧集' if is_tv else '电影'}候选",
                     "rating": rating,
                     "release": release,
+                    "poster": meta.get("poster", ""),
+                    "overview": meta.get("overview", ""),
                     "meta": meta,
+                    "is_tv": is_tv,
                 }
             )
         return candidates
@@ -691,7 +695,10 @@ def fetch_tmdb_candidates_raw(title, year=None, is_tv=True, api_key=""):
                     "msg": f"TMDb{'剧集' if is_tv else '电影'}候选",
                     "rating": rating,
                     "release": release,
+                    "poster": meta.get("poster", ""),
+                    "overview": meta.get("overview", ""),
                     "meta": meta,
+                    "is_tv": is_tv,
                 }
             )
         return candidates
@@ -866,7 +873,7 @@ def fetch_tmdb_candidates_raw(title, year=None, is_tv=True, api_key=""):
         queries = [q]
         if raw_query and _norm(raw_query) != _norm(q):
             queries.append(raw_query)
-        q_retry = re.sub(r"(?i)HD|閲嶅埗鐗坾閲嶈＝鐗坾Remaster|Edition", "", q).strip()
+        q_retry = re.sub(r"(?i)HD|重制版|重製版|Remaster|Edition", "", q).strip()
         if q_retry and q_retry != q:
             queries.append(q_retry)
 
@@ -947,7 +954,7 @@ def fetch_tmdb_candidates(title, year=None, is_tv=True, api_key=""):
     title = normalize_search_query_title(title)
     return cached_request(
         fetch_tmdb_candidates_raw,
-        get_cache_key("tmdb_candidates_v6", f"{title}_{year}_{is_tv}"),
+        get_cache_key("tmdb_candidates_v8", f"{title}_{year}_{is_tv}"),
         title,
         year,
         is_tv,
@@ -1310,3 +1317,154 @@ def fetch_tmdb_credits(tmdb_id, is_tv=True, api_key=""):
         is_tv,
         api_key,
     )
+
+
+def fetch_tmdb_collection_by_id_raw(collection_id, api_key=""):
+    """从 TMDB 获取合集(Collection)详情，返回 (title, cid, msg, meta) 元组。"""
+    if not collection_id or collection_id == "None" or not api_key.strip():
+        return (
+            str(collection_id),
+            "None",
+            format_error_message(ERROR_CODE_CONFIG, "未配置TMDb Key或ID无效"),
+            {},
+        )
+
+    try:
+        response = _tmdb_get(
+            f"https://api.themoviedb.org/3/collection/{collection_id}",
+            params={"api_key": api_key.strip(), "language": "zh-CN"},
+            timeout=TIMEOUT_DB_DETAIL,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        meta = {
+            "overview": data.get("overview", ""),
+            "poster": data.get("poster_path", ""),
+            "fanart": data.get("backdrop_path", ""),
+            "original_title": "",
+            "genres": [],
+            "studios": [],
+            "runtime": None,
+            "status": "",
+            "rating": 0,
+            "votes": 0,
+            "release": "",
+        }
+
+        parts = data.get("parts", [])
+        if parts:
+            first = parts[0]
+            meta["release"] = first.get("release_date") or ""
+            meta["original_title"] = first.get("original_title") or ""
+            meta["genres"] = [g["name"] for g in (first.get("genres") or []) if g.get("name")]
+            meta["rating"] = data.get("vote_average", 0) or first.get("vote_average", 0)
+            meta["votes"] = data.get("vote_count", 0) or first.get("vote_count", 0)
+
+        title = data.get("name", "") or str(collection_id)
+
+        # zh-CN 简介为空时补请英文版本
+        if not meta["overview"]:
+            try:
+                resp_en = _tmdb_get(
+                    f"https://api.themoviedb.org/3/collection/{collection_id}",
+                    params={"api_key": api_key.strip(), "language": "en-US"},
+                    timeout=TIMEOUT_DB_DETAIL,
+                )
+                if resp_en.status_code == 200:
+                    en_data = resp_en.json()
+                    meta["overview"] = en_data.get("overview", "")
+            except Exception:
+                pass
+
+        return title, str(data.get("id")), "合集ID锁定成功", meta
+    except requests.exceptions.Timeout:
+        return (
+            str(collection_id),
+            "None",
+            format_error_message(ERROR_CODE_TIMEOUT, "请求超时"),
+            {},
+        )
+    except requests.exceptions.HTTPError as err:
+        if err.response is not None and err.response.status_code == 404:
+            msg = format_error_message(ERROR_CODE_INVALID, "合集ID无效")
+        else:
+            msg = format_error_message(ERROR_CODE_HTTP, f"HTTP请求失败: {err}")
+        snippet = _response_body_snippet(getattr(err, "response", None))
+        if snippet:
+            logging.warning(f"TMDb合集查询HTTP失败，返回内容: {snippet}")
+        return str(collection_id), "None", msg, {}
+    except ValueError:
+        snippet = _response_body_snippet(locals().get("response"))
+        if snippet:
+            logging.warning(f"TMDb合集查询解析失败，返回内容: {snippet}")
+        return (
+            str(collection_id),
+            "None",
+            format_error_message(ERROR_CODE_PARSE, "响应解析失败"),
+            {},
+        )
+    except Exception as err:
+        logging.warning(f"TMDb合集查询异常: {err}")
+        return (
+            str(collection_id),
+            "None",
+            format_error_message(ERROR_CODE_UNKNOWN, "请求异常"),
+            {},
+        )
+
+
+def fetch_tmdb_collection_by_id(collection_id, api_key=""):
+    return cached_request(
+        fetch_tmdb_collection_by_id_raw,
+        get_cache_key("tmdb_collection", f"{collection_id}"),
+        collection_id,
+        api_key,
+    )
+
+
+def fetch_tmdb_tvshow_by_id_raw(tv_id, api_key=""):
+    """获取剧集本身的详细信息（不指定季/集），复用 fetch_tmdb_by_id_raw 逻辑。"""
+    return fetch_tmdb_by_id_raw(tv_id, is_tv=True, api_key=api_key)
+
+
+def fetch_tmdb_tvshow_by_id(tv_id, api_key=""):
+    return cached_request(
+        fetch_tmdb_tvshow_by_id_raw,
+        get_cache_key("tmdb_tvshow", f"{tv_id}"),
+        tv_id,
+        api_key,
+    )
+
+
+# ── Async wrappers (using asyncio.to_thread to avoid event-loop blocking) ──
+
+async def fetch_tmdb_candidates_raw_async(title, year=None, is_tv=True, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_candidates_raw, title, year=year, is_tv=is_tv, api_key=api_key)
+
+async def fetch_tmdb_candidates_async(title, year=None, is_tv=True, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_candidates, title, year=year, is_tv=is_tv, api_key=api_key)
+
+async def fetch_tmdb_by_id_raw_async(tmdb_id, is_tv=False, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_by_id_raw, tmdb_id, is_tv=is_tv, api_key=api_key)
+
+async def fetch_tmdb_by_id_async(tmdb_id, is_tv=False, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_by_id, tmdb_id, is_tv=is_tv, api_key=api_key)
+
+async def fetch_tmdb_credits_async(tmdb_id, is_tv=False, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_credits, tmdb_id, is_tv=is_tv, api_key=api_key)
+
+async def fetch_tmdb_episode_meta_async(tv_id, season, episode, api_key, series_title="", api_key_bgm=""):
+    return await asyncio.to_thread(fetch_tmdb_episode_meta, tv_id, season, episode, api_key, series_title=series_title, api_key_bgm=api_key_bgm)
+
+async def fetch_tmdb_season_data_async(tmdb_id, season_number, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_season_data, tmdb_id, season_number, api_key)
+
+async def fetch_tmdb_collection_by_id_async(collection_id, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_collection_by_id, collection_id, api_key=api_key)
+
+async def fetch_tmdb_tvshow_by_id_raw_async(tv_id, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_tvshow_by_id_raw, tv_id, api_key=api_key)
+
+async def fetch_tmdb_tvshow_by_id_async(tv_id, api_key=""):
+    return await asyncio.to_thread(fetch_tmdb_tvshow_by_id, tv_id, api_key=api_key)

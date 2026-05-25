@@ -85,7 +85,7 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
 .result-box {
   margin-top: 12px; padding: 12px; border-radius: 6px;
   font-family: "SF Mono", Consolas, monospace; font-size: 13px;
-  white-space: pre-wrap; word-break: break-all;
+  word-break: break-all;
   max-height: 400px; overflow: auto;
 }
 .result-box.success { background: #eafaf1; border: 1px solid #d5f5e3; }
@@ -121,6 +121,14 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
         .group-toggle.collapsed { transform: rotate(-90deg); }
         .group-files { overflow: hidden; transition: max-height 0.2s; }
         .group-files.collapsed { max-height: 0 !important; }
+        /* 手动刮削分组日志 */
+        .manual-log-group-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #eef2f7; font-weight: 600; font-size: 13px; border-radius: 4px; cursor: pointer; user-select: none; margin-top: 4px; }
+        .manual-log-group-header:hover { background: #e2e8f0; }
+        .manual-log-group-body { overflow: hidden; transition: max-height 0.2s; max-height: 2000px; }
+        .manual-log-group-body.collapsed { max-height: 0 !important; }
+        .manual-log-item { padding: 2px 0 2px 22px; font-size: 12.5px; line-height: 1.5; text-align: left; }
+        .progress-bar { height: 6px; background: #e8ecf1; border-radius: 3px; margin: 8px 0; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.3s; width: 0%; }
         .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
         .modal-content { background: white; border-radius: var(--radius); width: 90%; max-width: 700px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2); }
@@ -166,6 +174,95 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
   .main { padding: 16px; }
   .form-row { flex-direction: column; }
 }
+/* 搜索结果卡片 */
+.search-result-card {
+  display: flex; gap: 16px; padding: 16px 20px;
+  border-bottom: 1px solid #edf0f5;
+  transition: all 0.2s ease; align-items: flex-start;
+  cursor: default;
+}
+.search-result-card:hover { background: #f7f8fc; }
+.search-result-card:last-child { border-bottom: none; }
+.search-result-card:first-child { border-radius: 8px 8px 0 0; }
+.search-result-poster {
+  width: 60px; height: 90px; border-radius: 8px;
+  object-fit: cover; flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, #e8ecf1 0%, #d5dbe3 100%);
+}
+.search-result-poster-placeholder {
+  width: 60px; height: 90px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  background: linear-gradient(135deg, #e8ecf1 0%, #d5dbe3 100%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.search-result-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.search-result-title {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  line-height: 1.4; min-height: 24px;
+}
+.search-result-title-text {
+  font-size: 16px; font-weight: 600; color: #1a1a2e;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 280px; flex-shrink: 1;
+}
+.search-result-alt-title {
+  display: none;
+}
+.search-result-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.search-result-badge.movie { background: #e8f0fe; color: #1a73e8; }
+.search-result-badge.tv { background: #e6f7ed; color: #0d904f; }
+.search-result-badge.season { background: #fef3e2; color: #e37400; }
+.search-result-badge.collection { background: #f3e8fd; color: #7c3aed; }
+.search-result-badge.documentary { background: #e0f7fa; color: #00838f; }
+.search-result-badge.music_video { background: #fce8ef; color: #d63369; }
+.search-result-badge.variety { background: #fff8e1; color: #e67e22; }
+.search-result-badge.short { background: #eef0f7; color: #4a5594; }
+.search-result-rating {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 13px; color: #f59e0b; font-weight: 700;
+}
+.search-result-year {
+  font-size: 13px; color: #9098a8; font-weight: 500;
+}
+.search-result-overview {
+  font-size: 12.5px; color: #6b7280; margin-top: 2px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.6;
+}
+.search-result-action {
+  flex-shrink: 0; display: flex; align-items: flex-start; padding-top: 4px;
+}
+.search-result-action .btn-primary {
+  background: #4f6ef7; border-radius: 20px; padding: 6px 18px;
+  font-size: 13px; font-weight: 500; transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(79,110,247,0.2);
+}
+.search-result-action .btn-primary:hover {
+  background: #3b5de7; box-shadow: 0 4px 12px rgba(79,110,247,0.3);
+  transform: translateY(-1px);
+}
+/* 已选匹配信息卡片 */
+.selected-match-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; background: #f0faf5;
+  border: 1px solid #c6f0da; border-radius: 10px;
+  border-left: 4px solid #0d904f;
+}
+.selected-match-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #0d904f; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.selected-match-text { flex: 1; font-size: 14px; color: #374151; }
+.selected-match-text strong { color: #1a1a2e; font-size: 15px; }
+.selected-match-meta { display: flex; align-items: center; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -176,10 +273,16 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
   </div>
   <nav class="sidebar-nav">
     <div class="nav-item active" data-tab="scrape">
-      <span class="icon">📦</span><span>识别 & 刮削</span>
+      <span class="icon">📦</span><span>批量刮削</span>
+    </div>
+    <div class="nav-item" data-tab="manual-scrape">
+      <span class="icon">✋</span><span>手动刮削</span>
     </div>
     <div class="nav-item" data-tab="config">
       <span class="icon">⚙️</span><span>配置</span>
+    </div>
+    <div class="nav-item" data-tab="organize">
+      <span class="icon">🔗</span><span>整理</span>
     </div>
     <div class="nav-item" data-tab="about">
       <span class="icon">ℹ️</span><span>关于</span>
@@ -192,77 +295,11 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
 
 <div class="main">
 
-<!-- ===== 识别 & 刮削 ===== -->
+<!-- ===== 批量刮削 ===== -->
 <div class="tab active" id="tab-scrape">
-  <h2>📦 识别 & 刮削</h2>
-  <p class="desc">识别媒体文件信息，并刮削 NFO 元数据和图片到本地</p>
+  <h2>📦 批量刮削</h2>
+  <p class="desc">批量识别媒体文件，自动写入 NFO 元数据和图片到本地</p>
   <div id="scrapeModeWarning" class="result-box error" style="display:none">远程模式下不可用</div>
-
-  <div class="card">
-    <h3>单文件识别测试</h3>
-    <p class="desc" style="font-size:12px;color:var(--text-light)">测试单个文件的识别结果，不写入任何文件</p>
-    <div class="form-row">
-        <div class="form-group">
-            <label>文件路径</label>
-            <input type="text" id="testRecogPath" placeholder="/media/file.mkv">
-        </div>
-        <div class="form-group">
-            <label>文件名</label>
-            <input type="text" id="testRecogName" placeholder="file.mkv">
-        </div>
-    </div>
-    <div class="form-row">
-        <div class="form-group">
-            <label>数据源</label>
-            <select id="testRecogSource">
-                <option value="siliconflow_tmdb">TMDb</option>
-                <option value="bgm">Bangumi</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>媒体类型（可选）</label>
-            <select id="testRecogType">
-                <option value="">自动</option>
-                <option value="tv">剧集</option>
-                <option value="movie">电影</option>
-            </select>
-        </div>
-    </div>
-    <div class="actions">
-        <button class="btn btn-primary" onclick="testRecognize()">识别测试</button>
-        <button class="btn btn-outline" id="btnSelectFileForTest">选择文件</button>
-    </div>
-    <div id="testRecogResult" class="result-box info" style="display:none"></div>
-  </div>
-
-  <div class="card">
-    <h3>刮削单个文件</h3>
-    <p class="desc" style="font-size:12px;color:var(--text-light)">根据配置自动写入 NFO、海报等文件到媒体目录</p>
-    <div class="form-row">
-        <div class="form-group">
-            <label>文件路径</label>
-            <input type="text" id="scrapePath" placeholder="/media/file.mkv">
-        </div>
-        <div class="form-group">
-            <label>文件名</label>
-            <input type="text" id="scrapeName" placeholder="file.mkv">
-        </div>
-    </div>
-    <div class="form-row">
-        <div class="form-group">
-            <label>数据源</label>
-            <select id="scrapeSource">
-                <option value="siliconflow_tmdb">TMDb</option>
-                <option value="bgm">Bangumi</option>
-            </select>
-        </div>
-    </div>
-    <div class="actions">
-        <button class="btn btn-success" onclick="scrapeMedia()">刮削</button>
-        <button class="btn btn-outline" id="btnSelectFileForScrape">选择文件</button>
-    </div>
-    <div id="scrapeResult" class="result-box info" style="display:none"></div>
-  </div>
 
   <div class="card">
     <h3>批量刮削</h3>
@@ -287,6 +324,112 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
     <div id="batchScrapeResult" class="result-box info" style="display:none"></div>
   </div>
 </div>
+
+<!-- ===== 手动刮削 ===== -->
+<div class="tab" id="tab-manual-scrape">
+  <div class="tab-header">
+    <h2>✋ 手动刮削</h2>
+    <p>手动指定 TMDb ID 或搜索媒体名称来刮削，适用于自动识别失败或需要纠正的情况</p>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="form-group">
+        <label>选择要刮削的文件</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" onclick="manualSelectFile()">📂 选择单个文件</button>
+          <button class="btn btn-sm" onclick="manualSelectFolder()">📁 选择单个文件夹</button>
+          <span id="manual-file-count" style="align-self:center;color:var(--text-light);font-size:13px">未选择</span>
+        </div>
+      </div>
+      <div id="manual-selected-files-section" class="scan-results" style="display:none;margin-top:8px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div style="display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border);background:#f0f4f8">
+          <button class="btn btn-outline" style="font-size:12px;padding:4px 10px" id="btn-manual-collapse-all" onclick="manualCollapseAllGroups()">全部收起</button>
+          <button class="btn btn-outline" style="font-size:12px;padding:4px 10px" id="btn-manual-expand-all" onclick="manualExpandAllGroups()">全部展开</button>
+          <button class="btn btn-outline" style="font-size:12px;padding:4px 10px;color:#e74c3c;border-color:#e74c3c;margin-left:auto" onclick="manualClearFiles()">✕ 清空</button>
+        </div>
+        <div id="manual-selected-files-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h3 style="margin-top:0;margin-bottom:16px;font-size:15px;color:var(--text)">🔍 搜索或指定媒体信息</h3>
+      <div class="form-row" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div class="form-group" style="flex:2;min-width:180px;margin:0">
+          <label style="font-size:12px;margin-bottom:4px">媒体名称</label>
+          <input type="text" id="manual-title" placeholder="例: Breaking Bad" style="width:100%;padding:8px 12px;font-size:13px">
+        </div>
+        <div class="form-group" style="flex:0 0 100px;margin:0">
+          <label style="font-size:12px;margin-bottom:4px">年份</label>
+          <input type="number" id="manual-year" placeholder="2008" style="width:100%;padding:8px 12px;font-size:13px">
+        </div>
+        <div class="form-group" style="flex:0 0 120px;margin:0">
+          <label style="font-size:12px;margin-bottom:4px">类型</label>
+          <select id="manual-type" style="width:100%;padding:8px 12px;font-size:13px" onchange="onManualTypeChange()">
+            <option value="auto">自动</option>
+            <option value="movie">电影</option>
+            <option value="tv">剧集</option>
+            <option value="season">季</option>
+            <option value="collection">合集</option>
+            <option value="documentary">纪录片</option>
+            <option value="music_video">音乐视频</option>
+            <option value="variety">综艺</option>
+            <option value="short">短片</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <button class="btn btn-primary" onclick="manualSearch()" style="padding:8px 20px;border-radius:8px">🔍 搜索</button>
+        </div>
+      </div>
+      <div class="form-row" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:10px">
+        <div class="form-group" style="flex:1;min-width:120px;margin:0">
+          <label style="font-size:12px;margin-bottom:4px">或 TMDb ID</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" id="manual-tmdb-id" placeholder="例: 1396" style="width:180px;padding:8px 12px;font-size:13px">
+            <span style="font-size:11px;color:var(--text-light)">ID 优先于名称</span>
+          </div>
+        </div>
+        <div id="manual-season-fields" class="form-group" style="margin:0;display:none">
+          <label style="font-size:12px;margin-bottom:4px">季号</label>
+          <input type="number" id="manual-season-number" placeholder="例: 1" style="width:100px;padding:8px 12px;font-size:13px" min="1">
+          <span style="font-size:11px;color:var(--text-light);margin-left:6px">留空则列出所有季</span>
+        </div>
+        <div id="manual-collection-fields" class="form-group" style="margin:0;display:none">
+          <label style="font-size:12px;margin-bottom:4px">合集 ID</label>
+          <input type="number" id="manual-collection-id" placeholder="例: 295" style="width:160px;padding:8px 12px;font-size:13px" min="1">
+        </div>
+        <div id="manual-tv-id-field" class="form-group" style="margin:0;display:none">
+          <label style="font-size:12px;margin-bottom:4px">剧集 TMDb ID</label>
+          <input type="number" id="manual-tv-id" placeholder="例: 1396" style="width:140px;padding:8px 12px;font-size:13px" min="1">
+          <span style="font-size:11px;color:var(--text-light);margin-left:6px">季需要指定所属剧集</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="manual-search-result" style="display:none">
+    <div class="card">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)">
+        <span style="font-weight:600">搜索结果</span>
+        <span id="manual-search-count" style="font-size:12px;color:var(--text-light)"></span>
+      </div>
+      <div class="card-body" id="manual-search-body" style="padding:0">
+        <div id="manual-search-list" style="max-height:480px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="manual-progress-area" class="result-box info" style="display:none">
+    <div style="margin-bottom:8px;font-weight:600">正在刮削...</div>
+    <div id="manual-scrape-progress" style="color:#7f8c9b;font-size:13px"></div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="manual-progress-bar-fill"></div></div>
+    <div id="manual-scrape-time" style="color:#7f8c9b;font-size:12px"></div>
+    <div id="manual-scrape-logs" style="margin-top:12px;font-size:13px;line-height:1.6;display:none"></div>
+    <div id="manual-scrape-actions" style="margin-top:12px;display:none"></div>
+  </div>
+          </div>
 
 <!-- ===== 配置 ===== -->
 <div class="tab" id="tab-config">
@@ -368,7 +511,74 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
         <input type="checkbox" id="autoWriteFanart" checked onchange="saveAutoWriteConfig()">
         <label style="margin:0">下载剧照/背景图 (fanart.jpg / -thumb.jpg)</label>
       </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="autoWriteActors" onchange="saveAutoWriteConfig()">
+        <label style="margin:0">下载演员头像 (到 .actor 目录)</label>
+      </div>
       <p style="font-size:12px;color:var(--text-light);margin-top:8px">刮削时将根据以上选项自动写入对应的文件</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 整理 ===== -->
+<div class="tab" id="tab-organize">
+  <div class="tab-header">
+    <h2>📁 归档整理</h2>
+    <p>将识别后的媒体文件硬链接到媒体库目录，保留做种同时供 Emby/Jellyfin 使用</p>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-body">
+      <div class="form-group">
+        <label>选择要整理的文件</label>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="selectOrganizeFiles()">📂 浏览选择</button>
+          <span id="org-file-count" style="align-self:center;color:var(--text-light);font-size:13px">未选择</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>目标媒体库目录</label>
+        <input type="text" id="org-target" value="/media/library" placeholder="例: /media/library" style="width:100%">
+      </div>
+      <div class="form-group">
+        <label>整理模式</label>
+        <select id="org-mode" style="width:100%">
+          <option value="hardlink">硬链接 (推荐，省空间)</option>
+          <option value="copy">复制 (占用双倍空间)</option>
+          <option value="move">移动 (原文件不保留)</option>
+        </select>
+      </div>
+      <div class="form-row" style="display:flex;gap:16px">
+        <div class="form-group" style="flex:1">
+          <label>小文件阈值 (字节)</label>
+          <input type="number" id="org-threshold" value="1000000" style="width:120px">
+          <span class="hint" style="margin-left:8px;color:var(--text-light);font-size:12px">小于此值的文件直接复制</span>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>操作</label>
+          <div style="display:flex;gap:8px;align-items:center;height:36px">
+            <button class="btn btn-sm" id="org-preview-btn" onclick="organizePreview()">🔍 预览</button>
+            <button class="btn btn-sm btn-primary" id="org-execute-btn" onclick="organizeExecute()">▶ 执行整理</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="org-result" style="display:none">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body" id="org-summary"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">整理详情</div>
+      <div class="card-body" style="padding:0">
+        <div class="table-wrap" style="max-height:500px;overflow-y:auto">
+          <table class="table" id="org-result-table">
+            <thead>
+              <tr><th>源文件</th><th>目标路径</th><th>模式</th><th>状态</th></tr>
+            </thead>
+            <tbody id="org-result-body"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -465,7 +675,7 @@ let currentBrowserPath = "";
 let currentParentPath = null;
 let fileBrowserMode = "file"; // "file" | "directory"
 let selectedFile = null;
-let selectedDirs = []; // 多选目录列表
+let selectedDirs = [];
 let scannedScrapeFiles = [];
 let selectionCallback = null;
 
@@ -529,7 +739,7 @@ async function browseDirectory(path = null) {
     const fileList = document.getElementById("fileList");
     fileList.innerHTML = "";
     
-    // 清除当前目录下的选中状态（跨目录时）
+    // 清除跨目录时的选中状态
     if (fileBrowserMode === "directory") {
       const currentDirSelected = selectedDirs.some(d => d.startsWith(data.current_path + "/") || d === data.current_path);
       if (!currentDirSelected) {
@@ -638,10 +848,22 @@ function confirmSelection() {
     if (selectionCallback) selectionCallback(selectedFile);
     closeFileBrowser();
   } else if (fileBrowserMode === "directory" && selectedDirs.length > 0) {
-    scanMultipleDirectories(selectedDirs);
-    closeFileBrowser();
+    if (selectionCallback) {
+      selectionCallback(selectedDirs);
+      closeFileBrowser();
+    } else {
+      scanMultipleDirectories(selectedDirs);
+      closeFileBrowser();
+    }
   } else if (fileBrowserMode === "directory") {
     alert("请先勾选要扫描的目录");
+  } else if (fileBrowserMode === "folder" && currentBrowserPath) {
+    if (selectionCallback) {
+      selectionCallback(currentBrowserPath);
+    } else {
+      scanMultipleDirectories([currentBrowserPath]);
+    }
+    closeFileBrowser();
   } else {
     alert("请选择文件");
   }
@@ -823,20 +1045,6 @@ function updateScannedScrapeFilesDisplay() {
 }
 
 // 事件绑定
-document.getElementById("btnSelectFileForTest").addEventListener("click", () => {
-  openFileBrowser("file", "选择媒体文件", (file) => {
-    document.getElementById("testRecogPath").value = file.path;
-    document.getElementById("testRecogName").value = file.name;
-  });
-});
-
-document.getElementById("btnSelectFileForScrape").addEventListener("click", () => {
-  openFileBrowser("file", "选择媒体文件", (file) => {
-    document.getElementById("scrapePath").value = file.path;
-    document.getElementById("scrapeName").value = file.name;
-  });
-});
-
 document.getElementById("btnSelectDirectoryForScrape").addEventListener("click", () => {
   openFileBrowser("directory", "选择目录扫描媒体文件", null);
 });
@@ -891,11 +1099,13 @@ function loadAutoWriteConfig() {
     const writeNfo = localStorage.getItem("autoWriteNfo") !== "false";
     const writePoster = localStorage.getItem("autoWritePoster") !== "false";
     const writeFanart = localStorage.getItem("autoWriteFanart") !== "false";
+    const writeActors = localStorage.getItem("autoWriteActors") === "true";
     
     document.getElementById("autoWriteToggle").checked = enabled;
     document.getElementById("autoWriteNfo").checked = writeNfo;
     document.getElementById("autoWritePoster").checked = writePoster;
     document.getElementById("autoWriteFanart").checked = writeFanart;
+    document.getElementById("autoWriteActors").checked = writeActors;
     
     document.getElementById("autoWriteOptions").style.display = enabled ? "block" : "none";
   } catch (e) {
@@ -909,6 +1119,7 @@ function saveAutoWriteConfig() {
     localStorage.setItem("autoWriteNfo", document.getElementById("autoWriteNfo").checked);
     localStorage.setItem("autoWritePoster", document.getElementById("autoWritePoster").checked);
     localStorage.setItem("autoWriteFanart", document.getElementById("autoWriteFanart").checked);
+    localStorage.setItem("autoWriteActors", document.getElementById("autoWriteActors").checked);
   } catch (e) {
     console.error("保存配置失败:", e);
   }
@@ -926,6 +1137,7 @@ function getScrapeOptions() {
     download_images: enabled && document.getElementById("autoWritePoster").checked,
     write_nfo: enabled && document.getElementById("autoWriteNfo").checked,
     download_fanart: enabled && document.getElementById("autoWriteFanart").checked,
+    download_actor_images: enabled && document.getElementById("autoWriteActors").checked,
   };
 }
 
@@ -1042,40 +1254,635 @@ async function testRecognize() {
   }
 }
 
-// === Scrape ===
 let _scrapeAbortController = null;
+let _batchResults = [];
 
-async function scrapeMedia() {
-  const el = document.getElementById("scrapeResult");
-  const path = document.getElementById("scrapePath").value.trim();
-  const name = document.getElementById("scrapeName").value.trim();
-  if (!path || !name) { show(el, "请输入文件路径和文件名", "error"); return; }
-  
-  const opts = getScrapeOptions();
-  
+// ===== 手动刮削 =====
+let manualSelectedFiles = [];
+let manualSelectedMatch = null;
+
+function manualSelectFile() {
+  openFileBrowser("file", "选择一个媒体文件", (file) => {
+    if (!file) return;
+    manualSelectedFiles = [file];
+    document.getElementById("manual-file-count").textContent = `已选择 1 个文件: ${file.name}`;
+    document.getElementById("manual-progress-area").style.display = "none";
+    updateManualFileDisplay();
+    checkManualReady();
+  });
+}
+
+async function manualSelectFolder() {
+  const manualFileCount = document.getElementById("manual-file-count");
+  manualFileCount.textContent = "扫描中...";
+  openFileBrowser("folder", "选择一个文件夹（扫描其中媒体文件）", async (dirs) => {
+    const dirList = Array.isArray(dirs) ? dirs : [dirs];
+    if (!dirList.length) {
+      manualFileCount.textContent = "未选择";
+      return;
+    }
+    const dir = dirList[0];
+    manualFileCount.textContent = `正在扫描 ${dir.split("/").pop()}...`;
+    const allFiles = [];
+    try {
+      const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dir)}&recursive=true`, {
+        method: "POST"
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line);
+            if (data.type === "complete") {
+              allFiles.push(...data.media_files.map(f => ({ path: f.path, name: f.name, size: f.size })));
+            } else if (data.type === "error") {
+              throw new Error(data.message);
+            }
+          } catch (e) {
+            if (e.message !== "Unexpected end of JSON input") throw e;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("扫描目录失败:", e);
+      manualFileCount.textContent = `扫描失败: ${e.message}`;
+      return;
+    }
+    if (allFiles.length === 0) {
+      manualFileCount.textContent = "未找到媒体文件";
+      return;
+    }
+    manualSelectedFiles = allFiles;
+    manualFileCount.textContent = `已选择 ${allFiles.length} 个文件（来自 ${dir.split("/").pop()}）`;
+    document.getElementById("manual-progress-area").style.display = "none";
+    updateManualFileDisplay();
+    checkManualReady();
+  });
+}
+
+// ===== 手动刮削文件列表展示 =====
+let _manualGroupCollapseState = {};
+
+function updateManualFileDisplay() {
+  const section = document.getElementById("manual-selected-files-section");
+  const listEl = document.getElementById("manual-selected-files-list");
+  const countEl = document.getElementById("manual-file-count");
+
+  if (manualSelectedFiles.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "block";
+  countEl.textContent = `已选择 ${manualSelectedFiles.length} 个文件`;
+
+  const groups = {};
+  for (const file of manualSelectedFiles) {
+    const dir = file.path ? file.path.substring(0, file.path.lastIndexOf("/")) || "/" : "/";
+    if (!groups[dir]) groups[dir] = { name: dir.split("/").pop() || dir, files: [] };
+    groups[dir].files.push(file);
+  }
+
+  const groupNames = Object.keys(groups).sort();
+
+  for (const gid of groupNames) {
+    if (!(gid in _manualGroupCollapseState)) {
+      _manualGroupCollapseState[gid] = true;
+    }
+  }
+  for (const gid of Object.keys(_manualGroupCollapseState)) {
+    if (!groups[gid]) delete _manualGroupCollapseState[gid];
+  }
+
+  const allCollapsed = groupNames.every(gid => _manualGroupCollapseState[gid]);
+  const allExpanded = groupNames.every(gid => !_manualGroupCollapseState[gid]);
+
+  document.getElementById("btn-manual-collapse-all").disabled = allCollapsed;
+  document.getElementById("btn-manual-expand-all").disabled = allExpanded;
+
+  let html = "";
+
+  for (const gid of groupNames) {
+    const group = groups[gid];
+    const count = group.files.length;
+    const isCollapsed = _manualGroupCollapseState[gid];
+    html += `<div class="group-header" onclick="manualToggleGroup('${encodeURIComponent(gid)}')">
+      <span class="group-toggle${isCollapsed ? ' collapsed' : ''}">▼</span>
+      📁 ${escapeHtml(group.name)} <span style="color:var(--text-light);font-size:12px">${count} 个文件</span>
+    </div>`;
+    html += `<div class="group-files${isCollapsed ? ' collapsed' : ''}" style="max-height:${isCollapsed ? '0' : (count * 42 + 'px')}">`;
+    html += group.files.map(file => `
+      <div class="scan-item">
+        <span>📄</span>
+        <span style="flex:1">${escapeHtml(file.name)}</span>
+        <span style="color:var(--text-light);font-size:12px">${formatFileSize(file.size)}</span>
+      </div>
+    `).join("");
+    html += `</div>`;
+  }
+
+  listEl.innerHTML = html;
+}
+
+function manualToggleGroup(encodedGid) {
+  const gid = decodeURIComponent(encodedGid);
+  _manualGroupCollapseState[gid] = !_manualGroupCollapseState[gid];
+  updateManualFileDisplay();
+}
+
+function manualCollapseAllGroups() {
+  for (const gid in _manualGroupCollapseState) {
+    _manualGroupCollapseState[gid] = true;
+  }
+  updateManualFileDisplay();
+}
+
+function manualExpandAllGroups() {
+  for (const gid in _manualGroupCollapseState) {
+    _manualGroupCollapseState[gid] = false;
+  }
+  updateManualFileDisplay();
+}
+
+function manualClearFiles() {
+  manualSelectedFiles = [];
+  manualSelectedMatch = null;
+  _manualGroupCollapseState = {};
+  document.getElementById("manual-file-count").textContent = "未选择";
+  document.getElementById("manual-selected-files-section").style.display = "none";
+  document.getElementById("manual-search-result").style.display = "none";
+  document.getElementById("manual-progress-area").style.display = "none";
+  document.getElementById("manual-scrape-logs").innerHTML = "";
+  document.getElementById("manual-scrape-logs").style.display = "none";
+  document.getElementById("manual-scrape-progress").textContent = "";
+  document.getElementById("manual-scrape-time").textContent = "";
+  document.getElementById("manual-progress-bar-fill").style.width = "0%";
+  document.getElementById("manual-scrape-actions").style.display = "none";
+  document.getElementById("manual-search-count").textContent = "";
+  document.getElementById("manual-title").value = "";
+  document.getElementById("manual-year").value = "";
+  document.getElementById("manual-tmdb-id").value = "";
+  document.getElementById("manual-season-number").value = "";
+  document.getElementById("manual-collection-id").value = "";
+  document.getElementById("manual-tv-id").value = "";
+}
+
+function onManualTypeChange() {
+  const type = document.getElementById("manual-type").value;
+  document.getElementById("manual-season-fields").style.display = type === "season" ? "block" : "none";
+  document.getElementById("manual-collection-fields").style.display = type === "collection" ? "block" : "none";
+  document.getElementById("manual-tv-id-field").style.display = type === "season" ? "block" : "none";
+}
+
+async function manualSearch() {
+  const title = document.getElementById("manual-title").value.trim();
+  const tmdbId = document.getElementById("manual-tmdb-id").value.trim();
+  const year = document.getElementById("manual-year").value.trim();
+  const type = document.getElementById("manual-type").value;
+  const seasonNumber = document.getElementById("manual-season-number").value.trim();
+  const collectionId = document.getElementById("manual-collection-id").value.trim();
+
+  if (!title && !tmdbId && !collectionId) {
+    alert("请输入媒体名称或 TMDb ID");
+    return;
+  }
+
+  const resultEl = document.getElementById("manual-search-result");
+  const listEl = document.getElementById("manual-search-list");
+  const countEl = document.getElementById("manual-search-count");
+  resultEl.style.display = "block";
+  listEl.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-light)">🔍 搜索中...</div>';
+
   try {
-    const data = await api("/api/v1/media/scrape", {
-      method: "POST", body: JSON.stringify({
-        files: [{ path, name }],
-        source: document.getElementById("scrapeSource").value,
+    const body = {};
+    if (tmdbId) {
+      body.tmdb_id = parseInt(tmdbId);
+    }
+    if (title) {
+      body.title = title;
+    }
+    if (year) {
+      body.year = parseInt(year);
+    }
+    body.type = type;
+    if (seasonNumber) {
+      body.season_number = parseInt(seasonNumber);
+    }
+    if (collectionId) {
+      body.tmdb_id = parseInt(collectionId);
+      body.type = "collection";
+    }
+
+    const res = await fetch("/api/v1/media/tmdb-search", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (!data.results || !data.results.length) {
+      listEl.innerHTML = '<div style="text-align:center;padding:32px;color:#e67e22">未找到匹配结果，请调整搜索条件</div>';
+      countEl.textContent = "";
+      return;
+    }
+
+    countEl.textContent = `共 ${data.results.length} 条结果`;
+    listEl.innerHTML = data.results.map(r => {
+      const typeForLabel = r.type;
+      const cat = r.media_category || "";
+
+      let badgeClass = "movie";
+      let badgeIcon = "🎬";
+      let badgeText = "电影";
+      if (typeForLabel === "tv" && cat !== "season") { badgeClass = "tv"; badgeIcon = "📺"; badgeText = "剧集"; }
+      else if (typeForLabel === "season" || cat === "season") { badgeClass = "season"; badgeIcon = "📅"; badgeText = "季"; }
+      else if (typeForLabel === "collection" || cat === "collection") { badgeClass = "collection"; badgeIcon = "📚"; badgeText = "合集"; }
+      else if (cat === "documentary") { badgeClass = "documentary"; badgeIcon = "🎞️"; badgeText = "纪录片"; }
+      else if (cat === "music_video") { badgeClass = "music_video"; badgeIcon = "🎵"; badgeText = "音乐视频"; }
+      else if (cat === "variety") { badgeClass = "variety"; badgeIcon = "🎭"; badgeText = "综艺"; }
+      else if (cat === "short") { badgeClass = "short"; badgeIcon = "🎬"; badgeText = "短片"; }
+
+      const posterHtml = r.poster
+        ? `<img class="search-result-poster" src="/api/v1/media/image?path=${encodeURIComponent(r.poster)}&size=w92" alt="" onerror="this.style.display='none'">`
+        : `<div class="search-result-poster-placeholder">🎬</div>`;
+
+      const ratingHtml = r.rating ? `<span class="search-result-rating">⭐ ${Number(r.rating).toFixed(1)}</span>` : "";
+      const yearHtml = r.year ? `<span class="search-result-year">${r.year}</span>` : "";
+      const overviewHtml = r.overview ? `<div class="search-result-overview">${escapeHtml(r.overview)}</div>` : "";
+
+      return `<div class="search-result-card">
+        ${posterHtml}
+        <div class="search-result-info">
+          <div class="search-result-title">
+            <span class="search-result-title-text" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</span>
+            <span class="search-result-badge ${badgeClass}">${badgeIcon} ${badgeText}</span>
+            ${yearHtml}
+            ${ratingHtml}
+          </div>
+          ${overviewHtml}
+        </div>
+        <div class="search-result-action">
+          <button class="btn btn-sm btn-primary" onclick="manualSelectMatch(${r.id}, '${escapeHtml(r.title)}', '${r.year || ''}', '${r.type}', '${r.media_category || ''}', ${r.season_number !== undefined && r.season_number !== null ? r.season_number : null})">选择</button>
+        </div>
+      </div>`;
+    }).join("");
+  } catch (e) {
+    listEl.innerHTML = `<div style="text-align:center;padding:32px;color:#e74c3c">搜索失败: ${escapeHtml(e.message)}</div>`;
+    countEl.textContent = "";
+  }
+}
+
+function manualSelectMatch(id, title, year, type, mediaCategory, seasonNumber) {
+  manualSelectedMatch = { id, title, year, type, mediaCategory, seasonNumber };
+  const files = manualSelectedFiles;
+  if (!files.length) { alert("请先选择要刮削的文件"); return; }
+
+  showManualProgress(files, id, title, year, type, mediaCategory, seasonNumber);
+}
+
+function manualScrapeLog(text) {
+  const logEl = document.getElementById("manual-scrape-logs");
+  if (!logEl) return;
+  const entry = document.createElement("div");
+  entry.textContent = text;
+  entry.style.textAlign = "left";
+  logEl.appendChild(entry);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+async function showManualProgress(files, tmdbId, title, year, type, mediaCategory, seasonNumber) {
+  const progressArea = document.getElementById("manual-progress-area");
+  const logEl = document.getElementById("manual-scrape-logs");
+  const progressEl = document.getElementById("manual-scrape-progress");
+  const timeEl = document.getElementById("manual-scrape-time");
+  const barFill = document.getElementById("manual-progress-bar-fill");
+  const actionsEl = document.getElementById("manual-scrape-actions");
+
+  progressArea.style.display = "block";
+  progressArea.className = "result-box info";
+  logEl.style.display = "none";
+  actionsEl.style.display = "none";
+  progressEl.textContent = `正在刮削 ${files.length} 个文件...`;
+  barFill.style.width = "0%";
+  logEl.innerHTML = "";
+
+  const _startTime = Date.now();
+  timeEl.textContent = "⏱ 用时: 0s";
+  const _timerInterval = setInterval(() => {
+    const sec = Math.round((Date.now() - _startTime) / 1000);
+    timeEl.textContent = `⏱ 用时: ${sec < 60 ? sec + "s" : Math.floor(sec / 60) + "m " + (sec % 60) + "s"}`;
+  }, 1000);
+
+  const opts = getScrapeOptions();
+  const mediaType = document.getElementById("manual-type").value;
+
+  let total = 0;
+  let completedCount = 0;
+  let successCount = 0;
+  let failedCount = 0;
+  _batchResults = [];
+
+  try {
+    const res = await fetch("/api/v1/media/manual-scrape/stream", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        files: files.map(f => ({path: f.path, name: f.name})),
+        source: "tmdb",
+        tmdb_id: tmdbId,
+        title: title,
+        year: year || null,
+        media_type: type,
         download_images: opts.download_images || opts.download_fanart,
         write_nfo: opts.write_nfo,
+        download_actor_images: opts.download_actor_images,
+        media_category: mediaCategory || null,
+        season_number: seasonNumber || null,
       }),
     });
-    show(el, data, "success");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const data = JSON.parse(line);
+
+          if (data.type === "result") {
+            total = data.total;
+            completedCount++;
+            _batchResults.push(data.data);
+
+            const pct = total > 0 ? Math.round(completedCount / total * 100) : 0;
+            progressEl.textContent = `进度: ${completedCount}/${total} (${pct}%)`;
+            barFill.style.width = pct + "%";
+
+            if (data.success) {
+              successCount++;
+            } else {
+              failedCount++;
+            }
+          } else if (data.type === "complete") {
+            clearInterval(_timerInterval);
+            const elapsed = Math.round((Date.now() - _startTime) / 1000);
+            const timeStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+
+            barFill.style.width = "100%";
+            progressEl.textContent = `✅ 完成！总计: ${total}, 成功: ${successCount}, 失败: ${failedCount} (⏱ ${timeStr})`;
+            logEl.style.display = "block";
+
+            const seriesGroups = {};
+            _batchResults.forEach(r => {
+              const key = r.recognized_title || "未识别";
+              if (!seriesGroups[key]) seriesGroups[key] = [];
+              seriesGroups[key].push(r);
+            });
+
+            const seriesKeys = Object.keys(seriesGroups).sort();
+            seriesKeys.forEach(seriesName => {
+              const items = seriesGroups[seriesName];
+              const sSuccess = items.filter(i => i.success).length;
+              const allGood = sSuccess === items.length;
+
+              const header = document.createElement("div");
+              header.className = "manual-log-group-header";
+              const toggle = document.createElement("span");
+              toggle.className = "group-toggle collapsed";
+              toggle.textContent = "▶";
+              header.appendChild(toggle);
+              header.appendChild(document.createTextNode(`${allGood ? "✅" : "⚠️"} ${escapeHtml(seriesName)}`));
+              const count = document.createElement("span");
+              count.style.cssText = "color:var(--text-light);font-size:12px;margin-left:auto";
+              count.textContent = `${sSuccess}/${items.length}`;
+              header.appendChild(count);
+
+              const body = document.createElement("div");
+              body.className = "manual-log-group-body collapsed";
+
+              items.forEach(r => {
+                const icon = r.success ? "✅" : "❌";
+                const fname = r.original_name || (r.original_path || "").split("/").pop() || "未知";
+                let detail = "";
+                if (r.success) {
+                  const nf = (r.nfo_written || []).length;
+                  const im = (r.images_downloaded || []).length;
+                  detail = ` (${nf} NFO, ${im} 图片)`;
+                  const autoEnabled = document.getElementById("autoWriteToggle").checked;
+                  if (!autoEnabled) detail = " (未开启文件下载)";
+                } else {
+                  detail = `: ${(r.errors || [r.status]).join("; ")}`;
+                }
+                const item = document.createElement("div");
+                item.className = "manual-log-item";
+                item.textContent = `${icon} ${escapeHtml(fname)}${detail}`;
+                body.appendChild(item);
+              });
+
+              logEl.appendChild(header);
+              logEl.appendChild(body);
+
+              header.addEventListener("click", () => {
+                body.classList.toggle("collapsed");
+                toggle.classList.toggle("collapsed");
+              });
+            });
+
+            actionsEl.style.display = "flex";
+            actionsEl.style.gap = "8px";
+            actionsEl.style.flexWrap = "wrap";
+            actionsEl.innerHTML = `
+              <button class="btn btn-outline" onclick="viewBatchLogs()">📋 查看完整日志</button>
+              <button class="btn btn-outline" onclick="downloadBatchLogs()">📥 下载日志</button>
+            `;
+
+            if (failedCount === 0) {
+              progressArea.className = "result-box success";
+            } else if (successCount === 0) {
+              progressArea.className = "result-box error";
+            } else {
+              progressArea.className = "result-box warning";
+            }
+          }
+        } catch (e) {
+          // ignore parse errors for incomplete lines
+        }
+      }
+    }
   } catch (e) {
-    show(el, e.message, "error");
+    clearInterval(_timerInterval);
+    progressEl.textContent = `❌ 请求失败: ${escapeHtml(e.message)}`;
+    progressArea.className = "result-box error";
   }
+}
+
+function checkManualReady() {
+}
+
+// ===== 整理功能 =====
+let organizeSelectedFiles = [];
+
+async function organizePreview() {
+  const el = document.getElementById("org-result");
+  const summary = document.getElementById("org-summary");
+  const tbody = document.getElementById("org-result-body");
+  el.style.display = "none";
+
+  const files = organizeSelectedFiles;
+  if (!files.length) {
+    summary.innerHTML = '<div class="info" style="color:#e67e22">⚠️ 请先选择要整理的文件</div>';
+    el.style.display = "block";
+    return;
+  }
+
+  const target = document.getElementById("org-target").value.trim();
+  const mode = document.getElementById("org-mode").value;
+  const threshold = parseInt(document.getElementById("org-threshold").value) || 1000000;
+
+  summary.innerHTML = `<div class="info">🔍 预览模式... 共 ${files.length} 个文件</div>`;
+
+  try {
+    const res = await fetch("/api/v1/media/organize", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        files: files.map(f => ({path: f.path, name: f.name})),
+        target_root: target,
+        mode: mode,
+        threshold: threshold,
+        dry_run: true,
+      }),
+    });
+    const data = await res.json();
+    renderOrganizeResult(data, summary, tbody);
+    el.style.display = "block";
+  } catch (e) {
+    summary.innerHTML = `<div class="error">请求失败: ${e.message}</div>`;
+    el.style.display = "block";
+  }
+}
+
+async function organizeExecute() {
+  const el = document.getElementById("org-result");
+  const summary = document.getElementById("org-summary");
+  const tbody = document.getElementById("org-result-body");
+  el.style.display = "none";
+
+  const files = organizeSelectedFiles;
+  if (!files.length) {
+    summary.innerHTML = '<div class="info" style="color:#e67e22">⚠️ 请先选择要整理的文件</div>';
+    el.style.display = "block";
+    return;
+  }
+
+  const target = document.getElementById("org-target").value.trim();
+  const mode = document.getElementById("org-mode").value;
+  const threshold = parseInt(document.getElementById("org-threshold").value) || 1000000;
+
+  if (!confirm(`确定要 ${mode === "hardlink" ? "硬链接" : mode === "copy" ? "复制" : "移动"} ${files.length} 个文件到 ${target} 吗？`)) return;
+
+  summary.innerHTML = `<div class="info">⏳ 执行中...</div>`;
+  document.getElementById("org-execute-btn").disabled = true;
+
+  try {
+    const res = await fetch("/api/v1/media/organize", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        files: files.map(f => ({path: f.path, name: f.name})),
+        target_root: target,
+        mode: mode,
+        threshold: threshold,
+        dry_run: false,
+      }),
+    });
+    const data = await res.json();
+    renderOrganizeResult(data, summary, tbody);
+    el.style.display = "block";
+  } catch (e) {
+    summary.innerHTML = `<div class="error">请求失败: ${e.message}</div>`;
+    el.style.display = "block";
+  } finally {
+    document.getElementById("org-execute-btn").disabled = false;
+  }
+}
+
+function renderOrganizeResult(data, summaryEl, tbodyEl) {
+  const success = data.success || 0;
+  const failed = data.failed || 0;
+  const skipped = data.skipped || 0;
+  const total = data.total || 0;
+  summaryEl.innerHTML = `
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div><strong>总计:</strong> ${total}</div>
+      <div style="color:#27ae60"><strong>✅ 成功:</strong> ${success}</div>
+      <div style="color:#e67e22"><strong>⏭ 跳过:</strong> ${skipped}</div>
+      <div style="color:#e74c3c"><strong>❌ 失败:</strong> ${failed}</div>
+    </div>
+  `;
+
+  if (!data.results || !data.results.length) {
+    tbodyEl.innerHTML = '<tr><td colspan="4">无结果</td></tr>';
+    return;
+  }
+
+  tbodyEl.innerHTML = data.results.map(r => {
+    const statusIcon = r.success ? (r.mode === "preview" ? "🔍" : "✅") : "❌";
+    const modeLabel = r.mode === "hardlink" ? "🔗硬链接" : r.mode === "copy" ? "📋复制" : r.mode === "move" ? "📦移动" : r.mode === "preview" ? "预览" : r.mode === "already_exists" ? "⏭已存在" : r.mode;
+    return `<tr>
+      <td title="${r.src_name}">${escapeHtml(r.src_name)}</td>
+      <td title="${r.dst}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.dst || "-")}</td>
+      <td style="text-align:center">${modeLabel}</td>
+      <td style="text-align:center">${statusIcon} ${r.success ? "成功" : escapeHtml(r.error || "失败")}</td>
+    </tr>`;
+  }).join("");
+}
+
+function escapeHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// ===== 选择整理文件 =====
+function selectOrganizeFiles() {
+  openFileBrowser("file", "选择要整理的文件", (files) => {
+    organizeSelectedFiles = files;
+    document.getElementById("org-file-count").textContent = `已选择 ${files.length} 个文件`;
+    const summary = document.getElementById("org-summary");
+    summary.innerHTML = `<div class="info">✅ 已选择 ${files.length} 个文件。点击"预览"查看整理效果</div>`;
+    document.getElementById("org-result").style.display = "block";
+    document.getElementById("org-result-body").innerHTML = files.map(f =>
+      `<tr><td>${f.name}</td><td>${f.path}</td><td style="text-align:center">等待预览</td><td style="text-align:center">📋</td></tr>`
+    ).join("");
+  });
 }
 
 async function batchScrape() {
   const el = document.getElementById("batchScrapeResult");
   el.style.display = "block";
   el.className = "result-box info";
-  el.innerHTML = '<div style="margin-bottom: 8px; font-weight: 600;">正在刮削...</div><div id="scrapeProgress" style="color: #7f8c9b; font-size: 13px;"></div><div id="scrapeLogs" style="margin-top: 12px; font-size: 13px; line-height: 1.6;"></div><div id="scrapeTokenUsage" style="margin-top: 8px; font-size: 12px;"></div>';
-  
+  el.innerHTML = '<div style="margin-bottom: 8px; font-weight: 600;">正在刮削...</div><div id="scrapeProgress" style="color: #7f8c9b; font-size: 13px;"></div><div class="progress-bar"><div class="progress-bar-fill" id="scrapeProgressBarFill"></div></div><div id="scrapeTime" style="color: #7f8c9b; font-size: 12px;"></div><div id="scrapeLogs" style="margin-top: 12px; font-size: 13px; line-height: 1.6; display: none;"></div><div id="scrapeActions" style="margin-top: 12px; display: none;"></div><div id="scrapeTokenUsage" style="margin-top: 8px; font-size: 12px;"></div>';
+
   const progressEl = document.getElementById("scrapeProgress");
   const logsEl = document.getElementById("scrapeLogs");
+  const timeEl = document.getElementById("scrapeTime");
   const tokenUsageEl = document.getElementById("scrapeTokenUsage");
   
   document.getElementById("batchScrapeBtn").style.display = "none";
@@ -1090,8 +1897,15 @@ async function batchScrape() {
   let failedCount = 0;
   let completedCount = 0;
   let total = 0;
-  let logs = [];
   let failedItems = [];
+  let batchGroupState = {};
+  _batchResults = [];
+  const _startTime = Date.now();
+  timeEl.textContent = "⏱ 用时: 0s";
+  const _timerInterval = setInterval(() => {
+    const sec = Math.round((Date.now() - _startTime) / 1000);
+    timeEl.textContent = `⏱ 用时: ${sec < 60 ? sec + "s" : Math.floor(sec / 60) + "m " + (sec % 60) + "s"}`;
+  }, 1000);
 
   try {
     let files;
@@ -1110,7 +1924,7 @@ async function batchScrape() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         files,
-        source: document.getElementById("scrapeSource").value,
+        source: "tmdb",
         download_images: opts.download_images || opts.download_fanart,
         write_nfo: opts.write_nfo
       }),
@@ -1137,59 +1951,119 @@ async function batchScrape() {
         try {
           const data = JSON.parse(line);
           
-          if (data.type === "result") {
+          if (data.type === "progress") {
+            progressEl.textContent = data.message;
+            
+          } else if (data.type === "result") {
             total = data.total;
             completedCount++;
-            
-            progressEl.textContent = `进度: ${completedCount}/${total}`;
-            
-            const filename = data.data.original_name || data.data.original_path?.split("/").pop() || "未知";
-            const status = data.data.status || "";
-            
+            _batchResults.push(data.data);
+
+            const pct = total > 0 ? Math.round(completedCount / total * 100) : 0;
+            progressEl.textContent = `进度: ${completedCount}/${total} (${pct}%)`;
+            document.getElementById("scrapeProgressBarFill").style.width = pct + "%";
+
             if (data.success) {
               successCount++;
-              const title = data.data.recognized_title || "未识别";
-              if (!autoWriteEnabled) {
-                logs.push(`✅ ${filename} → ${title} (未开启文件下载)`);
-              } else {
-                const nfoCount = data.data.nfo_written?.length || 0;
-                const imgCount = data.data.images_downloaded?.length || 0;
-                logs.push(`✅ ${filename} → ${title} (${nfoCount} NFO, ${imgCount} 图片)`);
-              }
             } else {
               failedCount++;
-              const errors = data.data.errors || [status];
-              const detail = errors.join("; ");
-              logs.push(`❌ ${filename}: ${detail}`);
+              const errors = data.data.errors || [data.data.status || ""];
               failedItems.push({
-                name: filename,
+                name: data.data.original_name || data.data.original_path?.split("/").pop() || "未知",
                 path: data.data.original_path || "",
-                status: detail,
-                detail: detail,
+                status: errors.join("; "),
+                detail: errors.join("; "),
               });
             }
-            
-            if (logs.length > 20) {
-              logs = logs.slice(-20);
-            }
-            logsEl.textContent = logs.join("\n");
+
             logsEl.scrollTop = logsEl.scrollHeight;
             
           } else if (data.type === "complete") {
-            let summary = `完成！总计: ${total}, 成功: ${successCount}, 失败: ${failedCount}`;
+            clearInterval(_timerInterval);
+
+            const elapsed = Math.round((Date.now() - _startTime) / 1000);
+            const timeStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+
+            let summary = `✅ 完成！总计: ${total}, 成功: ${successCount}, 失败: ${failedCount} (⏱ ${timeStr})`;
             let completionDetail = "";
             if (!autoWriteEnabled) {
-              summary += " (⚠️ 未开启文件下载)";
+              summary += " ⚠️ 未开启文件下载";
               completionDetail = "⚠️ 自动写入刮削数据开关已关闭，未写入 NFO 和下载图片";
             }
             progressEl.textContent = summary;
-            
+
+            logsEl.style.display = "block";
+
+            const seriesGroups = {};
+            _batchResults.forEach(r => {
+              const key = r.recognized_title || "未识别";
+              if (!seriesGroups[key]) seriesGroups[key] = [];
+              seriesGroups[key].push(r);
+            });
+
+            const seriesKeys = Object.keys(seriesGroups).sort();
+            seriesKeys.forEach(seriesName => {
+              const items = seriesGroups[seriesName];
+              const sSuccess = items.filter(i => i.success).length;
+              const allGood = sSuccess === items.length;
+
+              const header = document.createElement("div");
+              header.className = "manual-log-group-header";
+              const toggle = document.createElement("span");
+              toggle.className = "group-toggle collapsed";
+              toggle.textContent = "▶";
+              header.appendChild(toggle);
+              header.appendChild(document.createTextNode(`${allGood ? "✅" : "⚠️"} ${escapeHtml(seriesName)}`));
+              const count = document.createElement("span");
+              count.style.cssText = "color:var(--text-light);font-size:12px;margin-left:auto";
+              count.textContent = `${sSuccess}/${items.length}`;
+              header.appendChild(count);
+
+              const body = document.createElement("div");
+              body.className = "manual-log-group-body collapsed";
+
+              items.forEach(r => {
+                const icon = r.success ? "✅" : "❌";
+                const fname = r.original_name || (r.original_path || "").split("/").pop() || "未知";
+                let detail = "";
+                if (r.success) {
+                  const nf = (r.nfo_written || []).length;
+                  const im = (r.images_downloaded || []).length;
+                  detail = ` (${nf} NFO, ${im} 图片)`;
+                  if (!autoWriteEnabled) detail = " (未开启文件下载)";
+                } else {
+                  detail = `: ${(r.errors || [r.status]).join("; ")}`;
+                }
+                const item = document.createElement("div");
+                item.className = "manual-log-item";
+                item.textContent = `${icon} ${escapeHtml(fname)}${detail}`;
+                body.appendChild(item);
+              });
+
+              logsEl.appendChild(header);
+              logsEl.appendChild(body);
+
+              header.addEventListener("click", () => {
+                body.classList.toggle("collapsed");
+                toggle.classList.toggle("collapsed");
+              });
+            });
+
+            const actionsEl = document.getElementById("scrapeActions");
+            actionsEl.style.display = "flex";
+            actionsEl.style.gap = "8px";
+            actionsEl.style.flexWrap = "wrap";
+            actionsEl.innerHTML = `
+              <button class="btn btn-outline" onclick="viewBatchLogs()">📋 查看完整日志</button>
+              <button class="btn btn-outline" onclick="downloadBatchLogs()">📥 下载日志</button>
+            `;
+
             if (data.token_usage) {
               const tu = data.token_usage;
               tokenUsageEl.textContent = `🤖 Token: 输入 ${tu.prompt_tokens} · 输出 ${tu.completion_tokens} · 总计 ${tu.total_tokens} (${tu.calls} 次调用) · 约 ¥${tu.cost_cache_miss.toFixed(4)} (缓存未命中) / ¥${tu.cost_cache_hit.toFixed(4)} (缓存命中)`;
               tokenUsageEl.style.color = "#8e44ad";
             }
-            
+
             if (failedCount === 0) {
               el.className = "result-box success";
             } else if (successCount === 0) {
@@ -1197,7 +2071,7 @@ async function batchScrape() {
             } else {
               el.className = "result-box warning";
             }
-            
+
             showCompletionModal("批量刮削完成", total, successCount, failedCount, failedItems);
             if (completionDetail) {
               document.getElementById("completionDetails").textContent = completionDetail;
@@ -1213,6 +2087,7 @@ async function batchScrape() {
     
   } catch (e) {
     if (e.name === "AbortError") {
+      clearInterval(_timerInterval);
       progressEl.textContent = `已停止 (已完成 ${completedCount} 个)`;
       el.className = "result-box warning";
     } else {
@@ -1229,6 +2104,82 @@ function stopBatchScrape() {
   if (_scrapeAbortController) {
     _scrapeAbortController.abort();
   }
+}
+
+function viewBatchLogs() {
+  if (!_batchResults.length) return;
+  const body = document.getElementById("failureLogBody");
+  body.innerHTML = _batchResults.map(r => {
+    const icon = r.success ? "✅" : "❌";
+    const fname = r.original_name || (r.original_path || "").split("/").pop() || "未知";
+    const path = r.original_path || "";
+    const title = r.recognized_title || "未识别";
+    const status = r.status || "";
+    const nfoFiles = r.nfo_written || [];
+    const imgFiles = r.images_downloaded || [];
+    const errors = r.errors || [];
+    const actors = r.actors_count || 0;
+    const dirs = r.directors || [];
+
+    let parts = [`<div class="failure-log-filename">${icon} ${escapeHtml(fname)}</div>`];
+    if (path) parts.push(`<div style="color:#7f8c9b;font-size:11px;font-family:monospace">${escapeHtml(path)}</div>`);
+    parts.push(`<div style="margin-top:4px">`);
+    parts.push(`<span style="color:var(--primary)">标题:</span> ${escapeHtml(title)}`);
+    if (status) parts.push(` <span style="color:var(--text-light)">|</span> <span style="color:var(--text-light)">状态:</span> ${escapeHtml(status)}`);
+    parts.push(`</div>`);
+    if (nfoFiles.length) {
+      parts.push(`<div style="font-size:11px;color:var(--success);margin-top:2px">📄 NFO (${nfoFiles.length}): ${escapeHtml(nfoFiles.join(", "))}</div>`);
+    }
+    if (imgFiles.length) {
+      parts.push(`<div style="font-size:11px;color:var(--primary);margin-top:1px">🖼 图片 (${imgFiles.length}): ${escapeHtml(imgFiles.join(", "))}</div>`);
+    }
+    if (actors) {
+      parts.push(`<div style="font-size:11px;color:#8e44ad;margin-top:1px">🎭 演员: ${actors}人</div>`);
+    }
+    if (dirs.length) {
+      parts.push(`<div style="font-size:11px;color:#e67e22;margin-top:1px">🎬 导演: ${escapeHtml(dirs.join(", "))}</div>`);
+    }
+    if (errors.length) {
+      parts.push(`<div style="font-size:11px;color:var(--danger);margin-top:1px">⚠️ 错误: ${escapeHtml(errors.join("; "))}</div>`);
+    }
+    return `<div class="failure-log-item">${parts.join("")}</div>`;
+  }).join("");
+  document.querySelector("#failureLogModal .modal-title").textContent = "📋 完整刮削日志";
+  document.getElementById("failureLogModal").classList.add("active");
+}
+
+function downloadBatchLogs() {
+  if (!_batchResults.length) return;
+  const lines = _batchResults.map(r => {
+    const icon = r.success ? "[成功]" : "[失败]";
+    const fname = r.original_name || (r.original_path || "").split("/").pop() || "未知";
+    const path = r.original_path || "";
+    const title = r.recognized_title || "未识别";
+    const status = r.status || "";
+    const nfoFiles = r.nfo_written || [];
+    const imgFiles = r.images_downloaded || [];
+    const errors = r.errors || [];
+    const actors = r.actors_count || 0;
+    const dirs = r.directors || [];
+
+    let linesArr = [`${icon} ${fname}`];
+    if (path) linesArr.push(`  路径: ${path}`);
+    linesArr.push(`  标题: ${title}`);
+    if (status) linesArr.push(`  状态: ${status}`);
+    if (nfoFiles.length) linesArr.push(`  NFO (${nfoFiles.length}): ${nfoFiles.join(", ")}`);
+    if (imgFiles.length) linesArr.push(`  图片 (${imgFiles.length}): ${imgFiles.join(", ")}`);
+    if (actors) linesArr.push(`  演员: ${actors}人`);
+    if (dirs.length) linesArr.push(`  导演: ${dirs.join(", ")}`);
+    if (errors.length) linesArr.push(`  错误: ${errors.join("; ")}`);
+    return linesArr.join("\n");
+  });
+  const content = `刮削日志 - ${new Date().toLocaleString("zh-CN")}\n${"=".repeat(50)}\n\n${lines.join("\n")}`;
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `scrape-log-${new Date().toISOString().slice(0, 10)}.log`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // === Config ===

@@ -25,6 +25,8 @@ if os.path.exists(config_path):
 tmdb_key = os.environ.get('METADATA_TMDB_API_KEY', '')
 bgm_key = os.environ.get('METADATA_BGM_API_KEY', '')
 mode = os.environ.get('METADATA_MODE', '')
+web_user = os.environ.get('METADATA_WEB_USERNAME', '')
+web_pass = os.environ.get('METADATA_WEB_PASSWORD', '')
 
 if tmdb_key:
     config['tmdb_api_key'] = tmdb_key
@@ -46,6 +48,8 @@ if tmdb_key:
     print('  METADATA_TMDB_API_KEY ✓')
 if bgm_key:
     print('  METADATA_BGM_API_KEY ✓')
+if web_user and web_pass:
+    print('  METADATA_WEB_USERNAME/METADATA_WEB_PASSWORD ✓')
 
 # 检查 API 缓存卷状态
 cache_path = os.path.join(DATA_DIR, 'api_cache.json')

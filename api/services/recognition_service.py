@@ -12,14 +12,14 @@ from utils.helpers import (
     derive_title_from_filename,
     extract_episode_number,
     safe_int,
+    candidate_to_result,
 )
 from db.tmdb_api import (
-    fetch_tmdb_candidates,
-    fetch_tmdb_info,
+    fetch_tmdb_candidates_async,
     fetch_bgm_candidates,
-    fetch_bgm_info,
-    fetch_tmdb_episode_meta,
+    fetch_tmdb_episode_meta_async,
     fetch_hybrid_episode_meta,
+    fetch_tmdb_credits_async,
 )
 from api.config import settings
 from api.schemas.media import (
@@ -37,15 +37,13 @@ async def prepopulate_ai_cache(files: list) -> None:
     unique_groups = {}
     for f in files:
         gid = getattr(f, "group_id", None) or (f.get("group_id") if isinstance(f, dict) else None)
-        fp = getattr(f, "filepath", None) or (f.get("filepath") if isinstance(f, dict) else None)
+        fp = getattr(f, "filepath", None) or getattr(f, "path", None) or (f.get("filepath") or f.get("path") if isinstance(f, dict) else None)
         fn = getattr(f, "filename", None) or (f.get("filename") if isinstance(f, dict) else None) or getattr(f, "name", None) or (f.get("name") if isinstance(f, dict) else None)
         if gid and gid not in _ai_result_cache and gid not in unique_groups and fp:
             unique_groups[gid] = (fn, fp)
 
     if not unique_groups:
         return
-
-    from api.services.ai_service import parse_media_filename
 
     for gid, (fn, fp) in unique_groups.items():
         try:
@@ -139,7 +137,7 @@ class RecognitionService:
     async def recognize_media(
         filename: str,
         filepath: Optional[str] = None,
-        source: str = "siliconflow_tmdb",
+        source: str = "tmdb",
         media_type_override: Optional[str] = None,
         group_id: Optional[str] = None,
     ) -> MediaRecognitionResponse:
@@ -165,9 +163,9 @@ class RecognitionService:
             match_result = None
             status_msg = "未识别"
 
-            if source == "siliconflow_tmdb" and not settings.tmdb_api_key:
+            if source == "tmdb" and not settings.tmdb_api_key:
                 status_msg = "未配置 TMDb API 密钥"
-            elif source == "siliconflow_bgm" and not settings.bgm_api_key:
+            elif source == "bgm" and not settings.bgm_api_key:
                 status_msg = "未配置 BGM API 密钥"
             else:
                 queries = await RecognitionService._build_search_queries(
@@ -175,8 +173,8 @@ class RecognitionService:
                 )
 
                 for search_title in queries:
-                    if source == "siliconflow_tmdb":
-                        candidates = fetch_tmdb_candidates(
+                    if source == "tmdb":
+                        candidates = await fetch_tmdb_candidates_async(
                             search_title, parse_result.year, is_tv, settings.tmdb_api_key
                         )
                     else:
@@ -187,18 +185,10 @@ class RecognitionService:
                     logger.info("搜索: title=%s, candidates=%s", search_title, len(candidates) if candidates else 0)
 
                     if candidates:
-                        if source == "siliconflow_tmdb":
-                            match_result = fetch_tmdb_info(
-                                search_title,
-                                year=parse_result.year,
-                                is_tv=is_tv,
-                                api_key=settings.tmdb_api_key,
-                            )
+                        if source == "tmdb":
+                            match_result = candidate_to_result(candidates[0], "TMDb命中")
                         else:
-                            match_result = fetch_bgm_info(
-                                candidates[0].get("id"),
-                                api_key=settings.bgm_api_key,
-                            )
+                            match_result = candidate_to_result(candidates[0], "BGM命中")
                         if match_result and len(match_result) >= 4:
                             _, mid, _, _ = match_result
                             if mid and mid != "None":
@@ -223,7 +213,7 @@ class RecognitionService:
                     metadata = EpisodeMetadata(
                         id=mid,
                         match_id=mid,
-                        provider="tmdb" if source == "siliconflow_tmdb" else "bgm",
+                        provider="tmdb" if source == "tmdb" else "bgm",
                         title=title,
                         original_title=meta.get("original_title"),
                         year=safe_int(meta.get("year")),
@@ -242,14 +232,22 @@ class RecognitionService:
                         type="episode" if is_tv else "movie",
                     )
 
+                    # 获取演职人员信息
+                    if source == "tmdb" and settings.tmdb_api_key:
+                        actors, directors = await fetch_tmdb_credits_async(
+                            mid, is_tv=is_tv, api_key=settings.tmdb_api_key
+                        )
+                        metadata.actors = actors
+                        metadata.directors = directors
+
                     if (
                         is_tv
                         and mid != "None"
                         and parse_result.season
                         and parse_result.episode
                     ):
-                        if source == "siliconflow_tmdb" and settings.tmdb_api_key:
-                            ep_title, ep_plot, still = fetch_tmdb_episode_meta(
+                        if source == "tmdb" and settings.tmdb_api_key:
+                            ep_title, ep_plot, still = await fetch_tmdb_episode_meta_async(
                                 mid,
                                 parse_result.season,
                                 parse_result.episode,
@@ -260,7 +258,7 @@ class RecognitionService:
                             metadata.ep_title = ep_title
                             metadata.ep_plot = ep_plot
                             metadata.still = still
-                        elif source == "siliconflow_bgm" and settings.bgm_api_key:
+                        elif source == "bgm" and settings.bgm_api_key:
                             ep_title, ep_plot, still, s_poster = fetch_hybrid_episode_meta(
                                 title,
                                 mid,

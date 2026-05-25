@@ -39,7 +39,7 @@ class MetadataAPIClient:
 
     def parse_filename(self, filename: str) -> dict:
         """解析文件名"""
-        response = self._post("/api/v1/recognition/parse", json_data=filename)
+        response = self._post("/api/v1/recognition/parse", json_data={"filename": filename})
         return response.json()
 
     def recognize_media(
@@ -84,13 +84,13 @@ class MetadataAPIClient:
         """刮削元数据"""
         payload = {
             "files": files,
+            "source": source,
             "download_images": download_images,
             "write_nfo": write_nfo
         }
         response = requests.post(
             f"{self.base_url}/api/v1/media/scrape",
             json=payload,
-            params={"source": source},
             headers=self._headers,
         )
         return response.json()

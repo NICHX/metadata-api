@@ -18,3 +18,4 @@ build/
 media_renamer_config.json
 1.json
 /data
+/.idea

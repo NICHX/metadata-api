@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import List, Dict, Any, Optional
 
-from utils.helpers import write_nfo, save_image
+from utils.helpers import write_nfo, async_save_image
 from api.services.recognition_service import RecognitionService, prepopulate_ai_cache
 from api.services.ai_service import get_and_reset_token_usage
 from api.schemas.media import FileInfo, EpisodeMetadata
@@ -40,7 +40,7 @@ class MediaOperationsService:
     @staticmethod
     async def scrape_metadata(
         file_info: FileInfo,
-        source: str = "siliconflow_tmdb",
+        source: str = "tmdb",
         download_images: bool = True,
         write_nfo_flag: bool = True
     ) -> Dict[str, Any]:
@@ -82,7 +82,7 @@ class MediaOperationsService:
         
         # 执行刮削
         try:
-            sidecar_result = MediaOperationsService._write_sidecar_files(
+            sidecar_result = await MediaOperationsService._write_sidecar_files(
                 file_info.path,
                 recog_result.metadata,
                 download_images=download_images,
@@ -107,7 +107,7 @@ class MediaOperationsService:
     @staticmethod
     async def batch_scrape(
         files: List[FileInfo],
-        source: str = "siliconflow_tmdb",
+        source: str = "tmdb",
         download_images: bool = True,
         write_nfo_flag: bool = True
     ) -> Dict[str, Any]:
@@ -169,7 +169,7 @@ class MediaOperationsService:
         return results
     
     @staticmethod
-    def _write_sidecar_files(
+    async def _write_sidecar_files(
         target_path: str,
         metadata: EpisodeMetadata,
         download_images: bool = True,
@@ -181,59 +181,74 @@ class MediaOperationsService:
             "images_downloaded": [],
             "errors": []
         }
-        
+
         target_dir = os.path.dirname(target_path)
-        media_type = "episode" if metadata.season and metadata.episode else "movie"
-        is_tv = media_type == "episode"
-        
+        media_category = getattr(metadata, "media_category", None)
+
+        # 根据 media_category 确定媒体类型
+        if media_category == "collection":
+            media_type = "collection"
+            is_tv = False
+        elif media_category == "season":
+            media_type = "season"
+            is_tv = True
+        elif media_category in ("documentary", "music_video", "variety", "short"):
+            media_type = media_category
+            is_tv = False
+        else:
+            media_type = "episode" if metadata.season and metadata.episode else "movie"
+            is_tv = media_type == "episode"
+
         image_tasks = []
-        
+
         try:
-            if is_tv:
-                # 剧集处理
-                ep_nfo = os.path.splitext(target_path)[0] + ".nfo"
-                if write_nfo_flag and not os.path.exists(ep_nfo):
-                    nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "episode")
-                    write_nfo(ep_nfo, nfo_data, "episodedetails")
-                    result["nfo_written"].append(ep_nfo)
-                
-                # 缩略图
-                thumb_source = metadata.still or metadata.s_poster or metadata.poster
-                if thumb_source and download_images:
-                    thumb_path = os.path.splitext(target_path)[0] + "-thumb.jpg"
-                    if not os.path.exists(thumb_path):
-                        image_tasks.append((thumb_path, thumb_source))
-                
+            if is_tv or media_type == "season":
+                # 剧集 / 季处理
+                if media_type != "season":
+                    # 常规剧集 NFO
+                    ep_nfo = os.path.splitext(target_path)[0] + ".nfo"
+                    if write_nfo_flag and not os.path.exists(ep_nfo):
+                        nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "episode")
+                        write_nfo(ep_nfo, nfo_data, "episodedetails")
+                        result["nfo_written"].append(ep_nfo)
+
+                    # 缩略图
+                    thumb_source = metadata.still or metadata.s_poster or metadata.poster
+                    if thumb_source and download_images:
+                        thumb_path = os.path.splitext(target_path)[0] + "-thumb.jpg"
+                        if not os.path.exists(thumb_path):
+                            image_tasks.append((thumb_path, thumb_source))
+
                 # 季和剧集文件夹处理
                 cur_dir = target_dir
                 dir_name = os.path.basename(cur_dir)
                 is_season_folder = bool(
                     re.match(r"^(Season\s*\d+|S\d+)$", dir_name, re.I)
                 )
-                
+
                 if is_season_folder and os.path.dirname(cur_dir):
                     root_d = os.path.dirname(cur_dir)
                 else:
                     root_d = cur_dir
-                
-                s_num = metadata.season or 1
+
+                s_num = metadata.season_number or metadata.season or 1
                 try:
                     s_fmt = f"{int(s_num):02d}"
                 except Exception:
                     s_fmt = str(s_num)
-                
+
                 # 季 NFO
                 s_nfo_root = os.path.join(root_d, f"season{s_fmt}.nfo")
                 if write_nfo_flag and not os.path.exists(s_nfo_root):
                     nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "season")
                     write_nfo(s_nfo_root, nfo_data, "season")
                     result["nfo_written"].append(s_nfo_root)
-                
+
                 if metadata.s_poster and download_images:
                     s_poster_root = os.path.join(root_d, f"season{s_fmt}-poster.jpg")
                     if not os.path.exists(s_poster_root):
                         image_tasks.append((s_poster_root, metadata.s_poster))
-                
+
                 # 季文件夹内的文件
                 if is_season_folder:
                     season_nfo_local = os.path.join(cur_dir, "season.nfo")
@@ -241,52 +256,62 @@ class MediaOperationsService:
                         nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "season")
                         write_nfo(season_nfo_local, nfo_data, "season")
                         result["nfo_written"].append(season_nfo_local)
-                    
+
                     folder_jpg_local = os.path.join(cur_dir, "folder.jpg")
                     if metadata.s_poster and download_images and not os.path.exists(folder_jpg_local):
                         image_tasks.append((folder_jpg_local, metadata.s_poster))
-                
+
                 # 电视节目 NFO 和海报
                 tvshow_nfo = os.path.join(root_d, "tvshow.nfo")
                 if write_nfo_flag and (not os.path.exists(tvshow_nfo) or MediaOperationsService._nfo_has_empty_plot(tvshow_nfo)):
                     nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "tvshow")
                     write_nfo(tvshow_nfo, nfo_data, "tvshow")
                     result["nfo_written"].append(tvshow_nfo)
-                
+
                 if metadata.poster and download_images:
                     poster_path = os.path.join(root_d, "poster.jpg")
                     if not os.path.exists(poster_path):
                         image_tasks.append((poster_path, metadata.poster))
-            
+
             else:
-                # 电影处理
+                # 电影 / 合集 / 纪录片/音乐视频/综艺/短片 处理
                 movie_nfo = os.path.splitext(target_path)[0] + ".nfo"
                 if write_nfo_flag and not os.path.exists(movie_nfo):
                     nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "movie")
                     write_nfo(movie_nfo, nfo_data, "movie")
                     result["nfo_written"].append(movie_nfo)
-                
+
                 if metadata.poster and download_images:
                     poster_path = os.path.join(target_dir, "poster.jpg")
                     if not os.path.exists(poster_path):
                         image_tasks.append((poster_path, metadata.poster))
-                
+
                 if metadata.fanart and download_images:
                     fanart_path = os.path.join(target_dir, "fanart.jpg")
                     if not os.path.exists(fanart_path):
                         image_tasks.append((fanart_path, metadata.fanart))
-            
-            # 下载图片
-            for img_path, img_url in image_tasks:
+
+            # 并发下载图片
+            async def _download(img_path: str, img_url: str):
                 try:
-                    save_image(img_path, img_url)
-                    result["images_downloaded"].append(img_path)
+                    await async_save_image(img_path, img_url)
+                    return img_path, None
                 except Exception as e:
-                    result["errors"].append(f"下载图片失败 {img_path}: {str(e)}")
-        
+                    return None, (img_path, str(e))
+
+            if image_tasks:
+                download_results = await asyncio.gather(
+                    *[_download(p, u) for p, u in image_tasks]
+                )
+                for img_path, err in download_results:
+                    if img_path:
+                        result["images_downloaded"].append(img_path)
+                    elif err:
+                        result["errors"].append(f"下载图片失败 {err[0]}: {err[1]}")
+
         except Exception as e:
             result["errors"].append(f"刮削失败: {str(e)}")
-        
+
         return result
     
     @staticmethod
@@ -313,6 +338,14 @@ class MediaOperationsService:
             "s_poster": metadata.s_poster,
             "id": metadata.match_id if hasattr(metadata, "match_id") else metadata.id,
             "provider": metadata.provider,
+            "media_category": getattr(metadata, "media_category", None),
+            "collection_id": getattr(metadata, "collection_id", None),
+            "collection_name": getattr(metadata, "collection_name", None),
+            "collection_poster": getattr(metadata, "collection_poster", None),
+            "tv_id": getattr(metadata, "tv_id", None),
+            "season_number": getattr(metadata, "season_number", metadata.season),
+            "actors": metadata.actors,
+            "directors": metadata.directors,
         }
         return data
     

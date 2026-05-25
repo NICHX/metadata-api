@@ -6,6 +6,7 @@ import re
 import platform
 import json
 import asyncio
+from collections import deque
 from api.dependencies import get_local_mode_only
 from api.schemas.media import (
     FileSystemItem,
@@ -220,10 +221,10 @@ async def scan_media_files_stream(
 
             media_files = []
             scanned_dirs = 0
-            directories_to_scan = [target_path]
+            directories_to_scan = deque([target_path])
 
             while directories_to_scan:
-                current_path = directories_to_scan.pop(0)
+                current_path = directories_to_scan.popleft()
                 scanned_dirs += 1
 
                 try:

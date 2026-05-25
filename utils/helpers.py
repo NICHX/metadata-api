@@ -1,3 +1,4 @@
+import asyncio
 import atexit
 import json
 import logging
@@ -9,6 +10,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from xml.dom import minidom
 
+import httpx
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -165,32 +167,6 @@ def format_error_message(code, message):
     return message_text
 
 
-def parse_error_message(message):
-    text = str(message or "").strip()
-    if not text:
-        return "", ""
-
-    if ":" in text:
-        code, detail = text.split(":", 1)
-        code = code.strip().upper()
-        if code in ERROR_CODES:
-            return code, detail.strip()
-
-    if "超时" in text:
-        return ERROR_CODE_TIMEOUT, text
-    if "未配置" in text:
-        return ERROR_CODE_CONFIG, text
-    if "HTTP" in text:
-        return ERROR_CODE_HTTP, text
-    if "解析失败" in text or "JSON" in text:
-        return ERROR_CODE_PARSE, text
-    if "无结果" in text or "未匹配" in text:
-        return ERROR_CODE_NO_RESULT, text
-    if "无效" in text:
-        return ERROR_CODE_INVALID, text
-    return ERROR_CODE_UNKNOWN, text
-
-
 def create_retry_session(
     retries=3, backoff_factor=0.5, status_forcelist=[500, 502, 503, 504]
 ):
@@ -211,7 +187,8 @@ def create_retry_session(
 session = create_retry_session()
 
 # 限制同时发起的图片下载并发数，防止 TMDB CDN 触发限速(10054)
-_image_semaphore = threading.Semaphore(2)
+_image_semaphore = threading.Semaphore(10)
+_image_semaphore_async = asyncio.Semaphore(10)
 
 
 def safe_filename(text):
@@ -239,31 +216,6 @@ def extract_year_from_release(release):
         return ""
     match = re.search(r"(\d{4})", str(release))
     return match.group(1) if match else ""
-
-
-def format_candidate_label(candidate):
-    title = candidate.get("title") or "未知"
-    alt_title = candidate.get("alt_title") or ""
-    if alt_title and normalize_compare_text(alt_title) == normalize_compare_text(title):
-        alt_title = ""
-    year = extract_year_from_release(candidate.get("release")) or "-"
-    rating = candidate.get("rating")
-    try:
-        rating_text = (
-            f"{float(rating):.1f}" if rating not in (None, "", 0, "0") else "-"
-        )
-    except Exception:
-        rating_text = "-"
-    parts = [title]
-    if alt_title:
-        parts.append(f"原名:{alt_title}")
-    parts.append(f"年份:{year}")
-    parts.append(f"评分:{rating_text}")
-    parts.append(f"ID:{candidate.get('id', '-')}")
-    source = candidate.get("msg")
-    if source:
-        parts.append(str(source))
-    return " | ".join(parts)
 
 
 def candidate_to_result(candidate, hit_msg):
@@ -296,26 +248,6 @@ def center_window(window, parent, width, height):
     x = max(0, x)
     y = max(0, y)
     window.geometry(f"{width}x{height}+{x}+{y}")
-
-
-def clean_search_title(title):
-    if not title:
-        return ""
-    # Keep bracket content (often contains series title), only remove bracket chars.
-    text = re.sub(r"[\[\]\(\)（）]", " ", title)
-    # Drop common release group tags like UHA-WINGS, KTXP, or VC-BETA.
-    text = re.sub(r"(?<![a-z0-9])[A-Z0-9]{2,}(?:-[A-Z0-9]{2,})+(?![a-z0-9])", " ", text)
-    text = LANG_TAG_COMBO_RE.sub(" ", text)
-    text = re.sub(
-        r"(?i)(?:10bit|FLAC|BluRay|1080p|720p|x264|x265|HEVC|Remastered|D3D-Raw|BDRip|Web-DL|NC\.Ver|完结合集|第.*?季|第.*?集|S\d{1,2}E\d{1,4}|EP?\s*\d{1,4})",
-        "",
-        text,
-    )
-    # Remove common language tags accidentally kept from filenames, like .cht/.chs/zh-CN.
-    text = LANG_TAG_TOKEN_RE.sub(" ", text)
-    text = re.sub(r"^[\W_]+|[\W_]+$", "", text, flags=re.UNICODE)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
 
 
 def is_meaningful_query_title(title):
@@ -483,182 +415,11 @@ def extract_episode_number(pure_name, guess_data=None, ai_data=None):
     return None
 
 
-def derive_title_from_filename(pure_name):
-    text = str(pure_name or "")
-    leading_group_title = extract_title_after_leading_release_group(text)
-    if leading_group_title:
-        return leading_group_title
-    bracket_title = extract_bracket_title_from_filename(text)
-    if bracket_title:
-        return bracket_title
-    text = text.replace("_", " ").replace(".", " ")
-    text = re.sub(r"(?i)\bS\d{1,2}E\d{1,4}\b.*$", "", text)
-    text = re.sub(r"(?i)\bEP?\s*\d{1,4}\b.*$", "", text)
-    text = re.sub(r"(?i)第\s*\d{1,4}\s*[集话話].*$", "", text)
-    text = re.sub(r"(?i)[\[\(（]\s*\d{1,4}(?:v\d+)?\s*[\]\)）]\s*$", "", text)
-    return clean_search_title(text)
 
-
-def split_mixed_title(title):
-    """Split mixed Chinese-English title into separate queries.
-
-    Example: "迷宫饭 Dungeon Meshi" -> ["Dungeon Meshi", "迷宫饭"]
-    """
-    if not title or not isinstance(title, str):
-        return []
-
-    text = title.strip()
-    # Check if title contains both Chinese and Latin characters
-    has_chinese = bool(re.search(r'[一-鿿]', text))
-    has_latin = bool(re.search(r'[a-zA-Z]', text))
-
-    if not (has_chinese and has_latin):
-        return []
-
-    # Split by common separators and whitespace
-    parts = re.split(r'[\s\.\-_]+', text)
-    chinese_parts = []
-    latin_parts = []
-
-    for part in parts:
-        part = part.strip()
-        if not part:
-            continue
-        if re.search(r'[一-鿿]', part):
-            chinese_parts.append(part)
-        elif re.search(r'[a-zA-Z]', part):
-            latin_parts.append(part)
-
-    results = []
-    if latin_parts:
-        results.append(' '.join(latin_parts))
-    if chinese_parts:
-        results.append(''.join(chinese_parts))
-
-    return results
 
 
 def text_mentions_extra_title(text):
     return bool(EXTRA_TITLE_MARKER_RE.search(str(text or "")))
-
-
-def build_query_titles(item, query_title, ai_data, g):
-    if isinstance(item, dict):
-        raw_name = item.get("old_name", "")
-        item_dir = item.get("dir", "") or ""
-    else:
-        raw_name = getattr(item, "old_name", "") or ""
-        item_dir = getattr(item, "dir", "") or ""
-
-    _known_exts = set(
-        e.strip().lower()
-        for e in (DEFAULT_VIDEO_EXTS + "," + DEFAULT_SUB_AUDIO_EXTS).split(",")
-        if e.strip()
-    )
-    pure = raw_name
-    for _ in range(3):
-        base, ext = os.path.splitext(pure)
-        if ext.lower() in _known_exts:
-            pure = base
-        else:
-            break
-    dir_title = os.path.basename(item_dir)
-    guess_title = clean_search_title((g.get("title") if g else None) or "")
-
-    show_dir_title = ""
-    if GENERIC_SEASON_TITLE_RE.match(dir_title.strip()):
-        parent_dir = os.path.dirname(item_dir)
-        if parent_dir:
-            show_dir_title = clean_search_title(os.path.basename(parent_dir))
-
-    # Build base candidates
-    candidates = [
-        query_title,
-        (ai_data or {}).get("title") if isinstance(ai_data, dict) else None,
-        guess_title,
-        extract_title_after_leading_release_group(pure),
-        extract_bracket_title_from_filename(pure),
-        derive_title_from_filename(pure),
-        show_dir_title,
-        clean_search_title(pure),
-        clean_search_title(dir_title),
-    ]
-
-    # Add split variants for mixed Chinese-English titles
-    for candidate in list(candidates):
-        if candidate:
-            split_titles = split_mixed_title(candidate)
-            candidates.extend(split_titles)
-
-    ordered = unique_keep_order(candidates)
-    return [c for c in ordered if is_meaningful_query_title(c)]
-
-
-def build_db_query_plan(item, query_title, ai_data, g):
-    """Build staged DB query titles.
-
-    When guessit failed to produce a meaningful title but AI did, search the
-    database with the AI title alone to avoid noisy filename tokens polluting
-    TMDb/BGM candidates.
-    """
-    if isinstance(item, dict):
-        raw_name = item.get("old_name", "")
-    else:
-        raw_name = getattr(item, "old_name", "") or ""
-
-    _known_exts = set(
-        e.strip().lower()
-        for e in (DEFAULT_VIDEO_EXTS + "," + DEFAULT_SUB_AUDIO_EXTS).split(",")
-        if e.strip()
-    )
-    pure = raw_name
-    for _ in range(3):
-        base, ext = os.path.splitext(pure)
-        if ext.lower() in _known_exts:
-            pure = base
-        else:
-            break
-
-    query_titles = build_query_titles(item, query_title, ai_data, g)
-    if not query_titles:
-        return []
-
-    ai_title = clean_search_title(
-        (ai_data or {}).get("title") if isinstance(ai_data, dict) else ""
-    )
-    guess_title = clean_search_title((g.get("title") if g else None) or "")
-    derived_title = derive_title_from_filename(pure)
-
-    if ai_title and (
-        not is_meaningful_query_title(guess_title)
-        or normalize_compare_text(guess_title) != normalize_compare_text(ai_title)
-    ):
-        if is_meaningful_query_title(guess_title) and (
-            normalize_compare_text(guess_title) != normalize_compare_text(ai_title)
-        ):
-            return [[ai_title], [guess_title]]
-        return [[ai_title]]
-
-    if (
-        derived_title
-        and LEADING_RELEASE_GROUP_RE.match(pure)
-        and normalize_compare_text(clean_search_title(pure))
-        != normalize_compare_text(derived_title)
-    ):
-        return [[derived_title]]
-
-    if (
-        derived_title
-        and GROUP_RELEASE_BRACKET_RE.match(pure)
-        and (
-            not is_meaningful_query_title(guess_title)
-            or normalize_compare_text(guess_title)
-            != normalize_compare_text(derived_title)
-        )
-    ):
-        return [[derived_title]]
-
-    return [query_titles]
 
 
 def parse_error_message(message):
@@ -1265,6 +1026,44 @@ def cached_request(api_func, cache_key, *args, **kwargs):
     return result
 
 
+async def cached_request_async(api_func, cache_key, *args, **kwargs):
+    global _cache_dirty, _cache_write_count
+    now_ts = datetime.now().timestamp()
+
+    with _cache_file_lock:
+        _ensure_cache_loaded_unlocked()
+        expired_count = _prune_expired_cache_entries(_cache_data, now_ts)
+        if expired_count > 0:
+            _cache_dirty = True
+            _flush_cache_to_disk_unlocked(force=False)
+
+        cached_entry = (_cache_data or {}).get(cache_key)
+        if isinstance(cached_entry, dict) and cached_entry.get("expiry", 0) >= now_ts:
+            cached_data = cached_entry.get("data")
+            if _is_cache_result_valid(cache_key, cached_data):
+                return cached_data
+            _cache_data.pop(cache_key, None)
+            _cache_dirty = True
+            _flush_cache_to_disk_unlocked(force=False)
+
+    result = await api_func(*args, **kwargs)
+
+    if _is_cache_result_valid(cache_key, result):
+        with _cache_file_lock:
+            _ensure_cache_loaded_unlocked()
+            _cache_data[cache_key] = {
+                "data": result,
+                "expiry": (
+                    datetime.now() + timedelta(days=CACHE_EXPIRY_DAYS)
+                ).timestamp(),
+            }
+            _cache_dirty = True
+            _cache_write_count += 1
+            _flush_cache_to_disk_unlocked(force=False)
+
+    return result
+
+
 def flush_api_cache(force=False):
     with _cache_file_lock:
         _ensure_cache_loaded_unlocked()
@@ -1297,6 +1096,33 @@ def save_image(path, url_part):
                     for chunk in res.iter_content(chunk_size=65536):
                         if chunk:
                             f.write(chunk)
+    except Exception as err:
+        logging.error(f"保存图片失败 {path}: {err}")
+
+
+async def async_save_image(path, url_part):
+    if not url_part:
+        return
+
+    try:
+        url = (
+            url_part
+            if url_part.startswith("http")
+            else f"https://image.tmdb.org/t/p/original{url_part}"
+        )
+        if os.path.exists(path):
+            return
+
+        async with _image_semaphore_async:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                res = await client.get(
+                    url,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    follow_redirects=True,
+                )
+                if res.status_code == 200:
+                    with open(path, "wb") as f:
+                        f.write(res.content)
     except Exception as err:
         logging.error(f"保存图片失败 {path}: {err}")
 
