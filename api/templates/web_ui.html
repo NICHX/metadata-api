@@ -482,8 +482,13 @@ document.querySelectorAll(".nav-item").forEach(item => {
 
 async function api(path, opts = {}) {
   const url = BASE + path;
+  const headers = { "Content-Type": "application/json", ...opts.headers };
+  const savedKey = localStorage.getItem("authKey");
+  if (savedKey) {
+    headers["Authorization"] = `Bearer ${savedKey}`;
+  }
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...opts.headers },
+    headers,
     ...opts,
   });
   const data = await res.json();

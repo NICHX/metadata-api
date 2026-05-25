@@ -42,7 +42,7 @@ pip install -r requirements.txt
 
 **方式一（推荐）：通过 Web UI 配置**
 
-启动后访问 `http://localhost:8000/web-ui`，在设置页面填入 API 密钥即可，配置会自动保存到 `data/media_renamer_config.json`。
+启动后访问 `http://localhost:8000/web-ui`，在设置页面填入 API 密钥即可，配置会自动保存到 `data/metadata_api_config.json`。
 
 **方式二：通过 API 设置**
 
@@ -54,11 +54,22 @@ curl -X PUT http://localhost:8000/api/v1/config \
 
 **方式三：环境变量（适用于 Docker 部署）**
 
-```bash
-export MEDIA_RENAMER_TMDB_API_KEY=your_tmdb_api_key
-export MEDIA_RENAMER_BGM_API_KEY=your_bgm_api_key
-export MEDIA_RENAMER_AI_API_KEY=your_ai_api_key
-```
+所有配置项均可通过环境变量设置，环境变量前缀为 `METADATA_`：
+
+| 环境变量 | 默认值 | 说明 |
+|---------|--------|------|
+| `METADATA_MODE` | `local` | 部署模式：`local`（完整文件操作）/ `remote`（仅 API） |
+| `METADATA_HOST` | `0.0.0.0` | 监听地址 |
+| `METADATA_PORT` | `8000` | 监听端口 |
+| `METADATA_AUTH_KEY` | （空） | API 认证密钥，请求需在 `Authorization` 或 `Authentication` 头中携带此值，留空则不启用鉴权 |
+| `METADATA_TMDB_API_KEY` | （空） | TMDb API 密钥 |
+| `METADATA_BGM_API_KEY` | （空） | Bangumi API 密钥 |
+| `METADATA_AI_API_KEY` | （空） | AI API 密钥（OpenAI 兼容） |
+| `METADATA_AI_BASE_URL` | `https://api.deepseek.com` | AI API 地址 |
+| `METADATA_AI_MODEL` | `deepseek-v4-pro` | AI 模型名称 |
+| `METADATA_AI_MAX_TOKENS` | `10000` | AI 最大 Token 数 |
+
+> 环境变量优先级高于 JSON 配置文件中的对应字段。若已设置环境变量，配置文件中的同名字段将被忽略。
 
 ### 启动
 
@@ -83,6 +94,7 @@ python main_api.py
 | `--host` | `0.0.0.0` | 监听地址 |
 | `--port` | `8000` | 监听端口 |
 | `--mode` | `local` | 部署模式：`local` / `remote` |
+| `--auth` | （空） | API 认证密钥，留空则不启用鉴权 |
 | `--local-only` | — | 仅允许本地访问 (127.0.0.1) |
 | `--reload` | — | 开发模式自动重载 |
 
@@ -105,7 +117,9 @@ docker pull ghcr.io/你的GitHub用户名/metadata-api:latest
 # 运行
 docker run -d \
   -p 8000:8000 \
-  -e MEDIA_RENAMER_TMDB_API_KEY=your_key \
+  -e METADATA_MODE=local \
+  -e METADATA_AUTH_KEY=your_secret_key \
+  -e METADATA_TMDB_API_KEY=your_key \
   -v /path/to/media:/media:ro \
   ghcr.io/你的GitHub用户名/metadata-api:latest
 ```
@@ -118,7 +132,9 @@ docker run -d \
 docker build -t metadata-api .
 docker run -d \
   -p 8000:8000 \
-  -e MEDIA_RENAMER_TMDB_API_KEY=your_key \
+  -e METADATA_MODE=local \
+  -e METADATA_AUTH_KEY=your_secret_key \
+  -e METADATA_TMDB_API_KEY=your_key \
   -v /path/to/media:/media:ro \
   metadata-api
 ```
@@ -202,7 +218,7 @@ metadata-api/
 │   └── templates/           # Jinja2 模板
 │       └── web_ui.html      # Web UI 页面
 ├── data/                    # 运行时数据卷（自动创建）
-│   ├── media_renamer_config.json  # 持久化配置文件
+│   ├── metadata_api_config.json  # 持久化配置文件
 │   └── api_cache.json       # API 缓存（TMDb/BGM）
 ├── db/                      # 数据源集成
 │   └── tmdb_api.py          # TMDb / Bangumi API 封装

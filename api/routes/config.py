@@ -22,6 +22,7 @@ class ConfigUpdate(BaseModel):
 async def get_config():
     return {
         "mode": settings.mode,
+        "auth_key_set": bool(settings.auth_key),
         "tmdb_api_key_set": bool(settings.tmdb_api_key),
         "bgm_api_key_set": bool(settings.bgm_api_key),
         "ai_api_key_set": bool(settings.ai_api_key),

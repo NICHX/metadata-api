@@ -5,7 +5,7 @@ import os
 
 DATA_DIR = "data"
 ORIGINAL_CONFIG_FILE = "renamer_config.json"
-NEW_CONFIG_FILE = os.path.join(DATA_DIR, "media_renamer_config.json")
+NEW_CONFIG_FILE = os.path.join(DATA_DIR, "metadata_api_config.json")
 
 
 class DeploymentMode(str, Enum):
@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # Header 认证密钥（所有 API 请求需在 Authorization 或 Authentication 头携带此密钥，留空则不启用）
+    auth_key: str = ""
+
     # TMDb/BGM 配置
     tmdb_api_key: str = ""
     bgm_api_key: str = ""
@@ -29,10 +32,11 @@ class Settings(BaseSettings):
     ai_max_tokens: int = 10000
 
     class Config:
-        env_prefix = "MEDIA_RENAMER_"
+        env_prefix = "METADATA_"
 
     def save_to_file(self):
         config_dict = {
+            "auth_key": self.auth_key,
             "tmdb_api_key": self.tmdb_api_key,
             "bgm_api_key": self.bgm_api_key,
             "ai_api_key": self.ai_api_key,
@@ -70,11 +74,13 @@ class Settings(BaseSettings):
         return False
 
     def _apply_config_dict(self, config_dict: dict):
-        if "tmdb_api_key" in config_dict and not os.environ.get("MEDIA_RENAMER_TMDB_API_KEY"):
+        if "auth_key" in config_dict and not os.environ.get("METADATA_AUTH_KEY"):
+            self.auth_key = config_dict.get("auth_key", "")
+        if "tmdb_api_key" in config_dict and not os.environ.get("METADATA_TMDB_API_KEY"):
             self.tmdb_api_key = config_dict.get("tmdb_api_key", "")
-        if "bgm_api_key" in config_dict and not os.environ.get("MEDIA_RENAMER_BGM_API_KEY"):
+        if "bgm_api_key" in config_dict and not os.environ.get("METADATA_BGM_API_KEY"):
             self.bgm_api_key = config_dict.get("bgm_api_key", "")
-        if "ai_api_key" in config_dict and not os.environ.get("MEDIA_RENAMER_AI_API_KEY"):
+        if "ai_api_key" in config_dict and not os.environ.get("METADATA_AI_API_KEY"):
             self.ai_api_key = config_dict.get("ai_api_key", "")
         if "ai_base_url" in config_dict:
             self.ai_base_url = config_dict.get("ai_base_url", "https://api.deepseek.com")

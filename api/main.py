@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import sys
 import os
@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.routes import recognition, config, media_operations, web_ui, filesystem
 from api.config import settings, DeploymentMode
+from api.dependencies import verify_auth
 
 app = FastAPI(
     title="Metadata API",
@@ -24,12 +25,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
-app.include_router(recognition.router)
-app.include_router(config.router)
-app.include_router(media_operations.router)
+# 注册路由（所有 API 路由需要 auth 验证，auth_key 留空时自动跳过）
+app.include_router(recognition.router, dependencies=[Depends(verify_auth)])
+app.include_router(config.router, dependencies=[Depends(verify_auth)])
+app.include_router(media_operations.router, dependencies=[Depends(verify_auth)])
 app.include_router(web_ui.router)
-app.include_router(filesystem.router)
+app.include_router(filesystem.router, dependencies=[Depends(verify_auth)])
 
 
 @app.get("/")

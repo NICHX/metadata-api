@@ -10,7 +10,7 @@ import json, os
 
 DATA_DIR = 'data'
 config = {}
-config_path = os.path.join(DATA_DIR, 'media_renamer_config.json')
+config_path = os.path.join(DATA_DIR, 'metadata_api_config.json')
 
 # 读取已有配置
 if os.path.exists(config_path):
@@ -20,21 +20,21 @@ if os.path.exists(config_path):
     except Exception:
         config = {}
 
-# 环境变量覆盖（MEDIA_RENAMER_ 前缀的变量由 pydantic-settings 自动读取）
+# 环境变量覆盖（METADATA_ 前缀的变量由 pydantic-settings 自动读取）
 # 这里手动写入文件，确保配置持久化
-tmdb_key = os.environ.get('MEDIA_RENAMER_TMDB_API_KEY', '')
-bgm_key = os.environ.get('MEDIA_RENAMER_BGM_API_KEY', '')
-renamer_mode = os.environ.get('MEDIA_RENAMER_MODE', '')
+tmdb_key = os.environ.get('METADATA_TMDB_API_KEY', '')
+bgm_key = os.environ.get('METADATA_BGM_API_KEY', '')
+mode = os.environ.get('METADATA_MODE', '')
 
 if tmdb_key:
     config['tmdb_api_key'] = tmdb_key
 if bgm_key:
     config['bgm_api_key'] = bgm_key
 
-# 部署模式由 pydantic-settings 在运行时自动读取 MEDIA_RENAMER_MODE 环境变量，
+# 部署模式由 pydantic-settings 在运行时自动读取 METADATA_MODE 环境变量，
 # 无需写入配置文件，但在此记录以便运维确认
-if renamer_mode:
-    print(f'  MEDIA_RENAMER_MODE={renamer_mode}')
+if mode:
+    print(f'  METADATA_MODE={mode}')
 
 # 写回配置文件
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -43,9 +43,9 @@ with open(config_path, 'w') as f:
 
 print(f'配置已持久化 -> {config_path}')
 if tmdb_key:
-    print('  MEDIA_RENAMER_TMDB_API_KEY ✓')
+    print('  METADATA_TMDB_API_KEY ✓')
 if bgm_key:
-    print('  MEDIA_RENAMER_BGM_API_KEY ✓')
+    print('  METADATA_BGM_API_KEY ✓')
 
 # 检查 API 缓存卷状态
 cache_path = os.path.join(DATA_DIR, 'api_cache.json')

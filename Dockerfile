@@ -15,9 +15,9 @@ WORKDIR /app
 ENV TZ=Asia/Shanghai
 
 # 环境变量（运行时可通过 -e 覆盖）
-#   MEDIA_RENAMER_TMDB_API_KEY    TMDb API 密钥（必填）
-#   MEDIA_RENAMER_BGM_API_KEY     Bangumi API 密钥（可选）
-#   MEDIA_RENAMER_MODE            部署模式: local / remote（默认 local）
+#   METADATA_TMDB_API_KEY    TMDb API 密钥（必填）
+#   METADATA_BGM_API_KEY     Bangumi API 密钥（可选）
+#   METADATA_MODE            部署模式: local / remote（默认 local）
 
 # 从 builder 复制 Python 依赖
 COPY --from=builder /root/.local /root/.local

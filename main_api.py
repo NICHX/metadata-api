@@ -44,6 +44,12 @@ def main():
         action="store_true",
         help="Enable auto-reload (for development)",
     )
+    parser.add_argument(
+        "--auth",
+        type=str,
+        default=None,
+        help="API 认证密钥，请求需在 Authorization 或 Authentication 头中携带此值（留空则不启用）",
+    )
 
     args = parser.parse_args()
 
@@ -53,6 +59,10 @@ def main():
     else:
         settings.mode = DeploymentMode.REMOTE
 
+    # 设置认证密钥（优先使用命令行参数，否则保持 env / config 中的值）
+    if args.auth is not None:
+        settings.auth_key = args.auth
+
     # 如果指定 --local-only，绑定到本地地址
     host = "127.0.0.1" if args.local_only else args.host
 
@@ -61,6 +71,10 @@ def main():
     print(f"API URL: {base_url}")
     print(f"Web UI:  {base_url}/web-ui")
     print(f"Swagger: {base_url}/docs")
+    if settings.auth_key:
+        print(f"Auth: Enabled（Authorization / Authentication header 验证已开启）")
+    else:
+        print(f"Auth: Disabled（无认证要求）")
 
     uvicorn.run(
         "api.main:app",

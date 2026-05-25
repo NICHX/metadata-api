@@ -6,11 +6,11 @@ services:
       - "8000:8000"
     environment:
       # TMDb API 密钥（必填）
-      - MEDIA_RENAMER_TMDB_API_KEY=${TMDB_API_KEY:-}
+      - METADATA_TMDB_API_KEY=${TMDB_API_KEY:-}
       # BGM API 密钥（可选）
-      - MEDIA_RENAMER_BGM_API_KEY=${BGM_API_KEY:-}
+      - METADATA_BGM_API_KEY=${BGM_API_KEY:-}
       # 部署模式: local / remote
-      - MEDIA_RENAMER_MODE=${MEDIA_RENAMER_MODE:-local}
+      - METADATA_MODE=${METADATA_MODE:-local}
     volumes:
       # 映射媒体文件夹（本地模式需要）
       - /path/to/your/media:/media:ro
