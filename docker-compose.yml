@@ -1,7 +1,7 @@
 services:
-  media-renamer:
+  metadata-api:
     build: .
-    container_name: media-renamer-api
+    container_name: metadata-api
     ports:
       - "8000:8000"
     environment:
@@ -10,13 +10,13 @@ services:
       # BGM API 密钥（可选）
       - MEDIA_RENAMER_BGM_API_KEY=${BGM_API_KEY:-}
       # 部署模式: local / remote
-      - MEDIA_RENAMER_MODE=local
+      - MEDIA_RENAMER_MODE=${MEDIA_RENAMER_MODE:-local}
     volumes:
       # 映射媒体文件夹（本地模式需要）
       - /path/to/your/media:/media:ro
-      # 持久化配置文件（容器启动时自动写入环境变量）
-      - media-renamer-config:/app/media_renamer_config.json
+      # 持久化数据（配置文件 + API 缓存，统一存储避免重复请求）
+      - media-renamer-data:/app/data
     restart: unless-stopped
 
 volumes:
-  media-renamer-config:
+  media-renamer-data:

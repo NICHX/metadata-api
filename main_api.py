@@ -13,7 +13,7 @@ logging.basicConfig(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Media Renamer API Server"
+        description="Metadata API Server"
     )
     parser.add_argument(
         "--host",
@@ -31,8 +31,8 @@ def main():
         "--mode",
         type=str,
         choices=["local", "remote"],
-        default="local",
-        help="Deployment mode (default: local)",
+        default=settings.mode.value,
+        help=f"Deployment mode (default: {settings.mode.value})",
     )
     parser.add_argument(
         "--local-only",
@@ -56,7 +56,7 @@ def main():
     # 如果指定 --local-only，绑定到本地地址
     host = "127.0.0.1" if args.local_only else args.host
 
-    print(f"Starting Media Renamer API in {settings.mode} mode...")
+    print(f"Starting Metadata API in {settings.mode} mode...")
     base_url = f"http://{host if host != '0.0.0.0' else 'localhost'}:{args.port}"
     print(f"API URL: {base_url}")
     print(f"Web UI:  {base_url}/web-ui")

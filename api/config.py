@@ -2,12 +2,10 @@ from pydantic_settings import BaseSettings
 from enum import Enum
 import json
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
+DATA_DIR = "data"
 ORIGINAL_CONFIG_FILE = "renamer_config.json"
-NEW_CONFIG_FILE = "media_renamer_config.json"
+NEW_CONFIG_FILE = os.path.join(DATA_DIR, "media_renamer_config.json")
 
 
 class DeploymentMode(str, Enum):
@@ -43,6 +41,7 @@ class Settings(BaseSettings):
             "ai_max_tokens": self.ai_max_tokens,
         }
         try:
+            os.makedirs(DATA_DIR, exist_ok=True)
             with open(NEW_CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config_dict, f, ensure_ascii=False, indent=2)
             return True

@@ -13,9 +13,10 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-USER_AGENT = "MyMediaRenamer/73.0 (Fully Customizable Edition)"
+USER_AGENT = "MetadataAPI/73.0 (Fully Customizable Edition)"
+DATA_DIR = "data"
 CONFIG_FILE = "renamer_config.json"
-CACHE_FILE = "api_cache.json"
+CACHE_FILE = os.path.join(DATA_DIR, "api_cache.json")
 CACHE_EXPIRY_DAYS = 7
 CACHE_FLUSH_INTERVAL_SECONDS = 8
 CACHE_FLUSH_MAX_WRITES = 20
@@ -1142,6 +1143,7 @@ def _prune_expired_cache_entries(cache, now_ts=None):
 def _ensure_cache_loaded_unlocked():
     global _cache_data
     if _cache_data is None:
+        os.makedirs(DATA_DIR, exist_ok=True)
         _cache_data = _load_cache_from_disk()
 
 

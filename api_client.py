@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Media Renamer API 调用示例
+Metadata API 调用示例
 """
 
 import requests
@@ -118,7 +118,7 @@ def main():
     client = MediaRenamerClient(base_url=server_url)
 
     print("=" * 60)
-    print(f"Media Renamer API 调用示例 (服务器: {server_url})")
+    print(f"Metadata API 调用示例 (服务器: {server_url})")
     print("=" * 60)
 
     # 1. 健康检查

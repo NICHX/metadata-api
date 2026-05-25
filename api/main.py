@@ -10,9 +10,9 @@ from api.routes import recognition, config, media_operations, web_ui, filesystem
 from api.config import settings, DeploymentMode
 
 app = FastAPI(
-    title="Media Renamer API",
+    title="Metadata API",
     description="媒体归档刮削助手 API",
-    version="3.3.0",
+    version="1.0.0",
 )
 
 # CORS 配置
@@ -39,8 +39,8 @@ async def root():
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/web-ui")
     return {
-        "name": "Media Renamer API",
-        "version": "3.3.0",
+        "name": "Metadata API",
+        "version": "1.0.0",
         "mode": settings.mode,
         "docs": "/docs",
         "redoc": "/redoc",
