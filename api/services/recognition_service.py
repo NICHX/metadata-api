@@ -108,6 +108,8 @@ class RecognitionService:
                     if group_id:
                         _ai_result_cache[group_id] = ai_title_from_parse
                         logger.info("AI结果已缓存: group_id=%s, title=%s", group_id, ai_title_from_parse)
+        elif filepath:
+            logger.warning("AI API密钥未配置，将跳过AI辅助标题推断，如需使用请在设置中配置AI API Key")
 
         if ai_title_from_parse:
             ai_cleaned = clean_search_title(ai_title_from_parse)
@@ -123,7 +125,7 @@ class RecognitionService:
             if bt.lower() not in [q.lower() for q in queries]:
                 queries.append(bt)
 
-        if filepath and not ai_title_from_parse:
+        if filepath and not ai_title_from_parse and settings.ai_api_key:
             ai_title = await asyncio.to_thread(infer_title_from_directory, filepath)
             if ai_title:
                 ai_cleaned = clean_search_title(ai_title)
