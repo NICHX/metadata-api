@@ -67,6 +67,8 @@ class OrganizeRequest(BaseModel):
     movie_template: Optional[str] = Field(None, description="电影路径模板，默认: {title} ({year})/{title}.{ext}")
     tv_template: Optional[str] = Field(None, description="剧集路径模板，默认: {title}/Season {season:02d}/{title} - S{season:02d}E{episode:02d}.{ext}")
     dry_run: bool = Field(True, description="预览模式，不实际操作")
+    skip_linked: bool = Field(True, description="跳过已硬链接的记录")
+    fallback_to_copy: bool = Field(True, description="硬链接失败时是否自动降级为复制")
 
 
 class OrganizeItem(BaseModel):
@@ -76,6 +78,11 @@ class OrganizeItem(BaseModel):
     mode: str
     success: bool
     error: Optional[str] = None
+    linked_skipped: bool = False
+    title: Optional[str] = None
+    season: Optional[int] = None
+    episode: Optional[int] = None
+    type: Optional[str] = None  # episode/movie
 
 
 class OrganizeResponse(BaseModel):
@@ -84,6 +91,7 @@ class OrganizeResponse(BaseModel):
     failed: int = 0
     skipped: int = 0
     results: List[OrganizeItem] = []
+    token_usage: Optional[dict] = None
 
 
 class TmdbCandidate(BaseModel):

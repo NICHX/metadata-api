@@ -1064,34 +1064,22 @@ async def scrape_metadata_stream(request: ScrapeRequest = Body(...)):
 @router.post("/rename")
 async def rename_files(request: RenameRequest = Body(...)):
     """原地重命名文件（仅本地模式可用）"""
-    if request.dry_run:
-        return {"success": True, "message": "预览模式，未执行任何操作", "dry_run": True}
-    
-    # TODO: 实现真实的重命名逻辑
-    return {"success": True, "message": "重命名功能开发中", "results": []}
+    from api.services.hardlink_service import DEFAULT_MOVIE_TEMPLATE, DEFAULT_TV_TEMPLATE
 
-
-@router.post("/organize", response_model=OrganizeResponse)
-async def organize_files(request: OrganizeRequest = Body(...)):
-    """归档整理 — 将识别后的媒体文件硬链接/复制/移动到目标媒体库目录"""
-    if not request.files:
-        return OrganizeResponse(total=0, success=0, failed=0, skipped=0, results=[])
-
-    movie_template = request.movie_template or DEFAULT_MOVIE_TEMPLATE
-    tv_template = request.tv_template or DEFAULT_TV_TEMPLATE
     results = []
 
     for file_info in request.files:
-        item = OrganizeItem(
-            src=file_info.path,
-            src_name=file_info.name,
-            dst="",
-            mode=request.mode,
-            success=False,
-        )
+        item = {
+            "original_path": file_info.path,
+            "original_name": file_info.name,
+            "new_name": None,
+            "new_path": None,
+            "success": False,
+            "error": None,
+        }
 
         if not os.path.exists(file_info.path):
-            item.error = "源文件不存在"
+            item["error"] = "源文件不存在"
             results.append(item)
             continue
 
@@ -1101,21 +1089,197 @@ async def organize_files(request: OrganizeRequest = Body(...)):
                 filepath=file_info.path,
             )
         except Exception as e:
-            item.error = f"识别失败: {str(e)}"
+            item["error"] = f"识别失败: {str(e)}"
             results.append(item)
             continue
 
-        if not recog_result.success or not recog_result.metadata:
-            item.error = f"识别失败: {recog_result.status}"
+        if not recog_result.success or not recog_result.suggested_new_name:
+            item["error"] = f"识别失败: {recog_result.status}"
             results.append(item)
             continue
 
-        metadata = recog_result.metadata
+        new_name = recog_result.suggested_new_name
+        dir_name = os.path.dirname(file_info.path)
+        new_path = os.path.join(dir_name, new_name)
+
+        item["new_name"] = new_name
+        item["new_path"] = new_path
 
         if request.dry_run:
-            ext = os.path.splitext(file_info.name)[1]
-            from api.services.hardlink_service import _build_target_path
-            dst = _build_target_path(metadata, request.target_root, ext, movie_template, tv_template)
+            item["success"] = True
+            results.append(item)
+            continue
+
+        if os.path.exists(new_path):
+            item["error"] = "目标文件已存在"
+            results.append(item)
+            continue
+
+        try:
+            os.rename(file_info.path, new_path)
+            item["success"] = True
+        except Exception as e:
+            item["error"] = str(e)
+            results.append(item)
+
+    success_count = sum(1 for r in results if r["success"])
+    failed_count = sum(1 for r in results if not r["success"])
+
+    return {
+        "success": failed_count == 0,
+        "total": len(results),
+        "success_count": success_count,
+        "failed_count": failed_count,
+        "dry_run": request.dry_run,
+        "results": results,
+    }
+
+
+@router.post("/organize", response_model=OrganizeResponse)
+async def organize_files(request: OrganizeRequest = Body(...)):
+    """归档整理 — 将识别后的媒体文件硬链接/复制/移动到目标媒体库目录（含重命名）"""
+    if not request.files:
+        return OrganizeResponse(total=0, success=0, failed=0, skipped=0, results=[])
+
+    movie_template = request.movie_template or DEFAULT_MOVIE_TEMPLATE
+    tv_template = request.tv_template or DEFAULT_TV_TEMPLATE
+
+    # Phase 1: 解析所有文件名（仅 guessit + 正则，不调用 AI）
+    parsed_files = []
+    for file_info in request.files:
+        parse_result = RecognitionService.parse_filename(file_info.name)
+        is_tv = parse_result.season is not None and parse_result.season > 0
+        parsed_files.append({
+            "file_info": file_info,
+            "parse": parse_result,
+            "is_tv": is_tv,
+            "dir_key": os.path.dirname(file_info.path),
+        })
+
+    # Phase 2: 按源目录分组，每目录只调用一次 recognize_media（含 AI + TMDb）
+    # 但只缓存公共元数据（标题/年份/类型），不缓存季/集（每文件不同）
+    dir_groups = {}
+    for pf in parsed_files:
+        dir_path = os.path.dirname(pf["file_info"].path)
+        dir_groups.setdefault(dir_path, []).append(pf)
+
+    from api.schemas.common import EpisodeMetadata
+
+    recog_cache = {}  # dir_path → {title, year, original_title, type, id, ep_title}
+    for dir_path, group in dir_groups.items():
+        sample = group[0]["file_info"]
+        found = False
+        try:
+            recog_result = await RecognitionService.recognize_media(
+                filename=sample.name,
+                filepath=sample.path,
+                group_id=dir_path,
+            )
+            if recog_result.success and recog_result.metadata:
+                m = recog_result.metadata
+                recog_cache[dir_path] = {
+                    "title": m.title,
+                    "original_title": m.original_title or "",
+                    "year": m.year or group[0]["parse"].year,
+                    "type": m.type,
+                    "id": m.id,
+                    "ep_title": m.ep_title or "",
+                }
+                found = True
+        except Exception:
+            pass
+        if not found:
+            pr = group[0]["parse"]
+            recog_cache[dir_path] = {
+                "title": pr.title,
+                "original_title": "",
+                "year": pr.year,
+                "type": "episode" if group[0]["is_tv"] else "movie",
+                "id": None,
+                "ep_title": "",
+            }
+
+    # 收集 AI token 用量
+    token_usage_list = get_and_reset_token_usage()
+    token_usage = None
+    if token_usage_list:
+        total_prompt = sum(u.get("prompt_tokens", 0) for u in token_usage_list)
+        total_completion = sum(u.get("completion_tokens", 0) for u in token_usage_list)
+        total_tokens = sum(u.get("total_tokens", 0) for u in token_usage_list)
+        costs = _estimate_ai_cost(token_usage_list)
+        token_usage = {
+            "prompt_tokens": total_prompt,
+            "completion_tokens": total_completion,
+            "total_tokens": total_tokens,
+            "calls": len(token_usage_list),
+            "cost_cache_miss": costs["cache_miss"],
+            "cost_cache_hit": costs["cache_hit"],
+        }
+
+    from api.services.hardlink_service import _build_target_path
+    from db.tmdb_api import fetch_tmdb_episode_meta_async
+
+    # Phase 3: 合并公共元数据 + 每文件的季/集 → 构建完整 EpisodeMetadata
+    _ep_title_cache = {}  # (dir, season, episode) → ep_title
+
+    async def _build_metadata(pf, cache_entry):
+        pr = pf["parse"]
+        meta = EpisodeMetadata(
+            title=cache_entry["title"],
+            original_title=cache_entry.get("original_title", ""),
+            year=cache_entry.get("year") or pr.year,
+            season=pr.season,
+            episode=pr.episode,
+            type=cache_entry.get("type", "episode" if pf["is_tv"] else "movie"),
+            ep_title="",
+        )
+        tmdb_id = cache_entry.get("id")
+        if tmdb_id and meta.type == "episode" and meta.season and meta.episode:
+            ep_key = (pf["dir_key"], meta.season, meta.episode)
+            if ep_key in _ep_title_cache:
+                meta.ep_title = _ep_title_cache[ep_key]
+            else:
+                try:
+                    ep_meta = await fetch_tmdb_episode_meta_async(
+                        tmdb_id, meta.season, meta.episode
+                    )
+                    if ep_meta and ep_meta.get("name"):
+                        _ep_title_cache[ep_key] = ep_meta["name"]
+                        meta.ep_title = ep_meta["name"]
+                    else:
+                        _ep_title_cache[ep_key] = ""
+                except Exception:
+                    _ep_title_cache[ep_key] = ""
+        return meta
+
+    results = []
+    for pf in parsed_files:
+        file_info = pf["file_info"]
+        cache_entry = recog_cache.get(os.path.dirname(file_info.path), {})
+        metadata = await _build_metadata(pf, cache_entry)
+
+        item = OrganizeItem(
+            src=file_info.path,
+            src_name=file_info.name,
+            dst="",
+            mode=request.mode,
+            success=False,
+            title=metadata.title,
+            season=metadata.season,
+            episode=metadata.episode,
+            type=metadata.type,
+        )
+
+        if not os.path.exists(file_info.path):
+            item.error = "源文件不存在"
+            results.append(item)
+            continue
+
+        ext = os.path.splitext(file_info.name)[1]
+
+        if request.dry_run:
+            dst = _build_target_path(metadata, request.target_root, ext,
+                                     movie_template, tv_template, original_name=file_info.name)
             item.dst = dst
             item.success = True
             item.mode = "preview"
@@ -1131,17 +1295,20 @@ async def organize_files(request: OrganizeRequest = Body(...)):
             mode=request.mode,
             movie_template=movie_template,
             tv_template=tv_template,
+            skip_linked=request.skip_linked,
+            fallback_to_copy=request.fallback_to_copy,
         )
         item.dst = result.get("dst", "")
         item.mode = result.get("mode", request.mode)
         item.success = result.get("success", False)
         item.error = result.get("error")
+        item.linked_skipped = result.get("linked_skipped", False)
         results.append(item)
 
     total = len(results)
     success_count = sum(1 for r in results if r.success)
     failed_count = sum(1 for r in results if not r.success)
-    skipped_count = sum(1 for r in results if r.mode == "already_exists")
+    skipped_count = sum(1 for r in results if r.mode in ("already_exists", "linked_skipped"))
 
     return OrganizeResponse(
         total=total,
@@ -1149,6 +1316,7 @@ async def organize_files(request: OrganizeRequest = Body(...)):
         failed=failed_count,
         skipped=skipped_count,
         results=results,
+        token_usage=token_usage,
     )
 
 

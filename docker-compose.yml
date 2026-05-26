@@ -18,6 +18,8 @@ services:
       # Web UI 登录凭证（留空则不需要登录）
       - METADATA_WEB_USERNAME=${WEB_USERNAME:-}
       - METADATA_WEB_PASSWORD=${WEB_PASSWORD:-}
+      # 媒体库目录路径（整理/刮削的默认目标目录，需与 volumes 映射一致）
+      - MEDIA_LIBRARY=${MEDIA_LIBRARY:-/media/library}
     volumes:
       # 映射媒体文件夹（本地模式需要）
       - /path/to/your/media:/media:ro

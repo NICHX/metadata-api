@@ -18,6 +18,7 @@ ENV TZ=Asia/Shanghai
 #   METADATA_TMDB_API_KEY    TMDb API 密钥（必填）
 #   METADATA_BGM_API_KEY     Bangumi API 密钥（可选）
 #   METADATA_MODE            部署模式: local / remote（默认 local）
+#   MEDIA_LIBRARY            媒体库目录路径（默认 /media/library）
 
 # 从 builder 复制 Python 依赖
 COPY --from=builder /root/.local /root/.local

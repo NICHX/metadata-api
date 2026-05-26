@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import sys
 import os
 
@@ -24,6 +25,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 静态文件
+api_dir = os.path.dirname(os.path.abspath(__file__))
+app.mount("/static", StaticFiles(directory=os.path.join(api_dir, "static")), name="static")
 
 # 注册路由（所有 API 路由需要 auth 验证，auth_key 留空时自动跳过）
 app.include_router(recognition.router, dependencies=[Depends(verify_auth)])

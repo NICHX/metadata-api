@@ -5,6 +5,8 @@ from fastapi.responses import StreamingResponse
 import os
 import json
 import asyncio
+import platform
+import sys
 
 router = APIRouter()
 
@@ -49,6 +51,29 @@ async def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html")
 
 
+@router.get("/api/v1/info")
+async def app_info():
+    from api.config import settings
+    return {
+        "app": {
+            "name": "Metadata API",
+            "version": "v1.0.2",
+            "mode": settings.mode.value if hasattr(settings.mode, 'value') else str(settings.mode),
+            "python": sys.version.split()[0],
+            "platform": platform.platform(),
+        },
+        "config": {
+            "tmdb_api_key": bool(settings.tmdb_api_key),
+            "bgm_api_key": bool(settings.bgm_api_key),
+            "ai_api_key": bool(settings.ai_api_key),
+            "ai_model": settings.ai_model,
+            "auth_key": bool(settings.auth_key),
+            "web_auth": bool(settings.web_username or settings.web_password),
+            "media_library": settings.media_library,
+        },
+    }
+
+
 @router.get("/web-ui")
 async def web_ui(request: Request):
     from api.routes.auth import is_authenticated
@@ -57,4 +82,5 @@ async def web_ui(request: Request):
     from api.config import settings
     return templates.TemplateResponse(request, "web_ui.html", {
         "auth_key": settings.auth_key or "",
+        "media_library": settings.media_library,
     })

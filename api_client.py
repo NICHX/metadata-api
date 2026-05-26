@@ -8,7 +8,7 @@ import json
 from typing import Optional, List
 
 # 默认服务器地址（局域网访问）
-BASE_URL = "http://192.168.31.252:8000"
+BASE_URL = "http://127.0.0.1:8000"
 
 
 class MetadataAPIClient:
@@ -38,14 +38,18 @@ class MetadataAPIClient:
         return response.json()
 
     def parse_filename(self, filename: str) -> dict:
-        """解析文件名"""
-        response = self._post("/api/v1/recognition/parse", json_data={"filename": filename})
+        """解析文件名（服务端期望裸字符串 body）"""
+        response = requests.post(
+            f"{self.base_url}/api/v1/recognition/parse",
+            data=filename,
+            headers={"Content-Type": "application/json", **self._headers},
+        )
         return response.json()
 
     def recognize_media(
         self,
         filename: str,
-        source: str = "siliconflow_tmdb",
+        source: str = "tmdb",
         media_type_override: Optional[str] = None,
     ) -> dict:
         """识别单个媒体文件"""
@@ -60,7 +64,7 @@ class MetadataAPIClient:
     def batch_recognize(
         self,
         filenames: List[str],
-        source: str = "siliconflow_tmdb"
+        source: str = "tmdb"
     ) -> dict:
         """批量识别媒体文件"""
         files = [{"filename": f} for f in filenames]
@@ -190,13 +194,19 @@ def main():
 
                 # 方式二：获取完整 URL
                 print(f"\n6. 获取海报 URL（方式二：直接 URL）...")
-                img_resp = requests.get(
-                    f"{args.server}/api/v1/media/image-url",
-                    params={"path": poster_path, "size": "w500"},
-                    headers=client._headers,
-                )
-                img_data = img_resp.json()
-                print(f"   完整 URL: {img_data['url']}")
+                try:
+                    img_resp = requests.get(
+                        f"{args.server}/api/v1/media/image-url",
+                        params={"path": poster_path, "size": "w500"},
+                        headers=client._headers,
+                    )
+                    img_data = img_resp.json()
+                    if "url" in img_data:
+                        print(f"   完整 URL: {img_data['url']}")
+                    else:
+                        print(f"   获取失败: {img_data.get('detail', '未知错误')}")
+                except Exception as e:
+                    print(f"   获取失败: {e}")
                 print(f"   （浏览器打开即可看到海报图片）")
 
             # 下载海报到本地

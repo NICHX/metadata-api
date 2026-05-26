@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     web_username: str = Field("", validation_alias="METADATA_WEB_USERNAME")
     web_password: str = Field("", validation_alias="METADATA_WEB_PASSWORD")
 
+    # 媒体库目录路径（整理/刮削的默认目标目录）
+    media_library: str = Field("/media/library", validation_alias="MEDIA_LIBRARY")
+
     class Config:
         env_prefix = "METADATA_"
 
