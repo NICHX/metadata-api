@@ -1131,7 +1131,7 @@ async function scBatchExecute() {
 
     const response = await fetch("/api/v1/media/scrape/stream", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (localStorage.getItem("authKey") || "") },
       body: JSON.stringify({
         files,
         source: "tmdb",
@@ -1507,7 +1507,7 @@ async function scManualSearch() {
 
     const res = await fetch("/api/v1/media/tmdb-search", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + (localStorage.getItem("authKey") || "") },
       body: JSON.stringify(body),
     });
     const data = await res.json();
@@ -1615,7 +1615,7 @@ async function scShowManualProgress(files, tmdbId, title, year, type, mediaCateg
   try {
     const res = await fetch("/api/v1/media/manual-scrape/stream", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + (localStorage.getItem("authKey") || "") },
       body: JSON.stringify({
         files: files.map(f => ({path: f.path, name: f.name})),
         source: "tmdb",

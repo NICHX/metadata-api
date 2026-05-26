@@ -15,7 +15,7 @@ MODE_COPY = "copy"
 MODE_MOVE = "move"
 
 DEFAULT_MOVIE_TEMPLATE = "{title} ({year})/{title}.{ext}"
-DEFAULT_TV_TEMPLATE = "{title}/Season {season:02d}/{title} - S{season:02d}E{episode:02d} - {ep_name}.{ext}"
+DEFAULT_TV_TEMPLATE = "{title} ({year})/Season {season:02d}/{title} - S{season:02d}E{episode:02d} - {ep_name}.{ext}"
 
 HISTORY_DIR = ".metadata-api"
 HISTORY_FILE = "hardlink_history.json"
@@ -103,6 +103,8 @@ def _build_target_path(
     template = tv_template if is_tv else movie_template
 
     path = template.format(**data)
+    if not metadata.year:
+        path = path.replace(" ()", "")
     return os.path.join(target_root, path)
 
 
