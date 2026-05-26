@@ -57,7 +57,7 @@ async def app_info():
     return {
         "app": {
             "name": "Metadata API",
-            "version": "v1.0.2",
+            "version": "v1.1.2",
             "mode": settings.mode.value if hasattr(settings.mode, 'value') else str(settings.mode),
             "python": sys.version.split()[0],
             "platform": platform.platform(),
