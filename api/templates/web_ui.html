@@ -37,6 +37,7 @@
 <div class="tab active" id="tab-hardlink">
   <h2>🔗 硬链接</h2>
   <p class="desc">将媒体文件硬链接/复制/移动到目标媒体库目录，保留做种同时供 Emby/Jellyfin 使用</p>
+  <div id="hardlinkTmdbWarning" class="result-box error" style="display:none">⚠️ TMDb API Key 未配置，硬链接功能不可用。请在「配置」页面设置 TMDb API Key。</div>
   <div class="card">
     <h3>硬链接设置</h3>
     <div class="form-group">
@@ -134,6 +135,7 @@
   <h2>📦 刮削</h2>
   <p class="desc">识别媒体文件并写入 NFO 元数据、下载海报和剧照到文件所在目录</p>
   <div id="scrapeModeWarning" class="result-box error" style="display:none">远程模式下不可用</div>
+  <div id="scrapeTmdbWarning" class="result-box error" style="display:none">⚠️ TMDb API Key 未配置，刮削功能不可用。请在「配置」页面设置 TMDb API Key。</div>
 
   <div class="sub-tabs">
     <div class="sub-tab active" data-subtab="batch" onclick="switchScrapeSubTab('batch')">批量刮削</div>

@@ -44,13 +44,12 @@ class Settings(BaseSettings):
 
     def save_to_file(self):
         config_dict = {
-            "auth_key": self.auth_key,
             "tmdb_api_key": self.tmdb_api_key,
             "bgm_api_key": self.bgm_api_key,
-            "ai_api_key": self.ai_api_key,
             "ai_base_url": self.ai_base_url,
             "ai_model": self.ai_model,
             "ai_max_tokens": self.ai_max_tokens,
+            "media_library": self.media_library,
         }
         try:
             os.makedirs(DATA_DIR, exist_ok=True)
@@ -96,6 +95,8 @@ class Settings(BaseSettings):
             self.ai_model = config_dict.get("ai_model", "deepseek-v4-flash")
         if "ai_max_tokens" in config_dict:
             self.ai_max_tokens = int(config_dict.get("ai_max_tokens", 10000))
+        if "media_library" in config_dict and not os.environ.get("MEDIA_LIBRARY"):
+            self.media_library = config_dict.get("media_library", "/media/library")
 
 
 settings = Settings()

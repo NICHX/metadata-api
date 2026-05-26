@@ -7,17 +7,46 @@ let fileBrowserMode = "file";
 let selectedFile = null;
 let selectedDirs = [];
 let selectionCallback = null;
+let _tmdbConfigured = false;
 
 // ===== Tab switching =====
 document.querySelectorAll(".nav-item").forEach(item => {
   item.addEventListener("click", () => {
+    const tab = item.dataset.tab;
+    if ((tab === "hardlink" || tab === "scrape") && !_tmdbConfigured) {
+      return;
+    }
     document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
     document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
     item.classList.add("active");
-    document.getElementById("tab-" + item.dataset.tab).classList.add("active");
-    if (item.dataset.tab === "config") loadConfig();
+    document.getElementById("tab-" + tab).classList.add("active");
+    if (tab === "config") loadConfig();
   });
 });
+
+function updateTabStates() {
+  let needsRedirect = false;
+  document.querySelectorAll(".nav-item").forEach(item => {
+    const tab = item.dataset.tab;
+    if ((tab === "hardlink" || tab === "scrape") && !_tmdbConfigured) {
+      item.classList.add("disabled");
+      if (item.classList.contains("active")) needsRedirect = true;
+    } else {
+      item.classList.remove("disabled");
+    }
+  });
+  if (needsRedirect) {
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    const aboutNav = document.querySelector('.nav-item[data-tab="about"]');
+    if (aboutNav) {
+      aboutNav.classList.add("active");
+      document.getElementById("tab-about").classList.add("active");
+    }
+  }
+  document.getElementById("hardlinkTmdbWarning").style.display = !_tmdbConfigured ? "block" : "none";
+  document.getElementById("scrapeTmdbWarning").style.display = !_tmdbConfigured ? "block" : "none";
+}
 
 function hlUpdateFileDisplay() {
   const section = document.getElementById("hl-scanned-files-section");
@@ -294,6 +323,8 @@ async function loadAbout() {
     const data = await api("/api/v1/info");
     const a = data.app || {};
     const c = data.config || {};
+    _tmdbConfigured = !!c.tmdb_api_key;
+    updateTabStates();
     const badge = (v) => v ? '<span class="badge-on">已启用</span>' : '<span class="badge-off">未配置</span>';
     container.innerHTML = `
       <div class="about-grid">
@@ -1844,4 +1875,5 @@ function renderServerLog() {
 checkHealth();
 loadAutoWriteConfig();
 loadRoot();
+updateTabStates();
 loadAbout();
