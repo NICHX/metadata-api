@@ -462,7 +462,7 @@ async function scanMultipleDirectories(dirList) {
     `;
     const progressEl = document.getElementById("scanProgressInfo");
     try {
-      const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dir)}&recursive=true`, { method: "POST" });
+      const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dir)}&recursive=true`, { method: "POST", headers: { "Authorization": "Bearer " + (localStorage.getItem("authKey") || "") } });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -611,7 +611,7 @@ async function hlSelectFolder() {
     for (const dir of dirList) {
       document.getElementById("hl-file-count").innerHTML = `<span class="spinner"></span>正在扫描 (${++scannedCount}/${dirList.length}): ${dir.split("/").pop()}`;
       try {
-        const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dir)}&recursive=true`, { method: "POST" });
+        const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dir)}&recursive=true`, { method: "POST", headers: { "Authorization": "Bearer " + (localStorage.getItem("authKey") || "") } });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -881,7 +881,7 @@ async function rnSelectFolder() {
     if (!dirList.length) return;
     document.getElementById("rn-file-count").textContent = "正在扫描...";
     try {
-      const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dirList[0])}&recursive=true`, { method: "POST" });
+      const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dirList[0])}&recursive=true`, { method: "POST", headers: { "Authorization": "Bearer " + (localStorage.getItem("authKey") || "") } });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -1352,7 +1352,7 @@ async function scManualSelectFolder() {
     countEl.textContent = `正在扫描 ${dirList[0].split("/").pop()}...`;
     const allFiles = [];
     try {
-      const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dirList[0])}&recursive=true`, { method: "POST" });
+      const response = await fetch(`/api/v1/filesystem/scan/stream?path=${encodeURIComponent(dirList[0])}&recursive=true`, { method: "POST", headers: { "Authorization": "Bearer " + (localStorage.getItem("authKey") || "") } });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
