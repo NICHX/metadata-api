@@ -373,13 +373,15 @@ def fetch_tmdb_by_id_raw(tmdb_id, is_tv=True, api_key=""):
         response.raise_for_status()
         data = response.json()
 
+        release = data.get("first_air_date") or data.get("release_date") or ""
         meta = {
             "overview": data.get("overview", ""),
             "rating": data.get("vote_average", 0),
             "votes": data.get("vote_count", 0),
             "poster": data.get("poster_path", ""),
             "fanart": data.get("backdrop_path", ""),
-            "release": data.get("first_air_date") or data.get("release_date") or "",
+            "release": release,
+            "year": int(release[:4]) if release and len(release) >= 4 and release[:4].isdigit() else None,
             "original_title": data.get("original_name") or data.get("original_title") or "",
             "genres": [g["name"] for g in (data.get("genres") or []) if g.get("name")],
             "studios": [
@@ -1352,12 +1354,16 @@ def fetch_tmdb_collection_by_id_raw(collection_id, api_key=""):
             "rating": 0,
             "votes": 0,
             "release": "",
+            "year": None,
         }
 
         parts = data.get("parts", [])
         if parts:
             first = parts[0]
             meta["release"] = first.get("release_date") or ""
+            rel = meta["release"]
+            if rel and len(rel) >= 4 and rel[:4].isdigit():
+                meta["year"] = int(rel[:4])
             meta["original_title"] = first.get("original_title") or ""
             meta["genres"] = [g["name"] for g in (first.get("genres") or []) if g.get("name")]
             meta["rating"] = data.get("vote_average", 0) or first.get("vote_average", 0)

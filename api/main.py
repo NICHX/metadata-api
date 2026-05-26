@@ -4,6 +4,8 @@ from fastapi.staticfiles import StaticFiles
 import sys
 import os
 
+APP_VERSION = "1.1.2"
+
 # 确保能找到项目根目录
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -14,7 +16,7 @@ from api.dependencies import verify_auth
 app = FastAPI(
     title="Metadata API",
     description="媒体归档刮削助手 API",
-    version="1.0.0",
+    version=APP_VERSION,
 )
 
 # CORS 配置
@@ -47,7 +49,7 @@ async def root():
         return RedirectResponse(url="/web-ui")
     return {
         "name": "Metadata API",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "mode": settings.mode,
         "docs": "/docs",
         "redoc": "/redoc",

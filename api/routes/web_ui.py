@@ -53,11 +53,12 @@ async def login_page(request: Request):
 
 @router.get("/api/v1/info")
 async def app_info():
+    from api.main import APP_VERSION
     from api.config import settings
     return {
         "app": {
             "name": "Metadata API",
-            "version": "v1.1.2",
+            "version": f"v{APP_VERSION}",
             "mode": settings.mode.value if hasattr(settings.mode, 'value') else str(settings.mode),
             "python": sys.version.split()[0],
             "platform": platform.platform(),

@@ -37,7 +37,7 @@ async def parse_filename(
 async def recognize_media(
     filename: str = Body(..., examples=["Breaking.Bad.S01E01.Pilot.mkv"]),
     filepath: str = Body(None, examples=["/path/to/Breaking.Bad.S01E01.Pilot.mkv"]),
-    source: str = Body("siliconflow_tmdb", description="数据源: siliconflow_tmdb / siliconflow_bgm"),
+    source: str = Body("tmdb", description="数据源: tmdb / bgm"),
     media_type_override: str = Body(None, description="媒体类型: auto / movie / tv"),
 ):
     try:

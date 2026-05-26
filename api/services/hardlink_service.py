@@ -105,6 +105,8 @@ def _build_target_path(
     path = template.format(**data)
     if not metadata.year:
         path = path.replace(" ()", "")
+    dot_ext = f".{data['ext']}"
+    path = path.replace(f" - {dot_ext}", dot_ext).replace(f" {dot_ext}", dot_ext)
     return os.path.join(target_root, path)
 
 
