@@ -7,7 +7,7 @@ import platform
 import json
 import asyncio
 from collections import deque
-from api.dependencies import get_local_mode_only
+from api.dependencies import verify_auth
 from api.schemas.media import (
     FileSystemItem,
     DirectoryContentsResponse,
@@ -19,7 +19,7 @@ from utils.helpers import DEFAULT_VIDEO_EXTS
 router = APIRouter(
     prefix="/api/v1/filesystem",
     tags=["filesystem"],
-    dependencies=[Depends(get_local_mode_only)],
+    dependencies=[Depends(verify_auth)],
 )
 
 SEASON_RE = re.compile(r"(?:season\s*|s)(\d+)|第\s*(\d+)\s*季", re.IGNORECASE)

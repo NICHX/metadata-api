@@ -210,14 +210,14 @@ function goToParent() {
   browseDirectory(currentParentPath !== null ? currentParentPath : null);
 }
 
-function openFileBrowser(mode, title, callback) {
+function openFileBrowser(mode, title, callback, startPath) {
   fileBrowserMode = mode;
   document.getElementById("fileBrowserTitle").textContent = title;
   document.getElementById("fileBrowserModal").classList.add("active");
   selectedFile = null;
   selectedDirs = [];
   updateSelectedDirsCount();
-  browseDirectory();
+  browseDirectory(startPath || null);
   selectionCallback = callback;
 }
 
@@ -650,10 +650,11 @@ async function hlSelectFolder() {
 }
 
 function hlSelectTargetDir() {
+  const target = document.getElementById("hl-target").value.trim();
   openFileBrowser("folder", "选择目标媒体库目录", (dirPath) => {
     const path = Array.isArray(dirPath) ? dirPath[0] : dirPath;
     if (path) document.getElementById("hl-target").value = path;
-  });
+  }, target || null);
 }
 
 function getThresholdBytes() {

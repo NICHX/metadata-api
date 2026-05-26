@@ -14,3 +14,4 @@ poster_sample.jpg
 .venv/
 .DS_Store
 .env
+api_client.py

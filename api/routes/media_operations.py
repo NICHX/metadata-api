@@ -6,7 +6,7 @@ import json
 import asyncio
 import os
 
-from api.dependencies import get_local_mode_only
+from api.dependencies import verify_auth
 from api.schemas.media import (
     FileInfo,
     PreviewRenameRequest,
@@ -36,7 +36,7 @@ TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
 router = APIRouter(
     prefix="/api/v1/media",
     tags=["media-operations"],
-    dependencies=[Depends(get_local_mode_only)],
+    dependencies=[Depends(verify_auth)],
 )
 
 
