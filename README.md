@@ -122,6 +122,8 @@ Docker Compose 会自动创建 `media-renamer-data` 卷，将配置文件和 API
 | `METADATA_HOST` | `0.0.0.0` | 监听地址 |
 | `METADATA_PORT` | `8000` | 监听端口 |
 | `METADATA_AUTH_KEY` | （空） | API 认证密钥，请求需在 `Authorization` 或 `Authentication` 头中携带此值，留空则不启用鉴权 |
+| `METADATA_WEB_USERNAME` | （空） | Web UI 基础认证用户名，与 `METADATA_WEB_PASSWORD` 同时设置后生效 |
+| `METADATA_WEB_PASSWORD` | （空） | Web UI 基础认证密码，与 `METADATA_WEB_USERNAME` 同时设置后生效 |
 | `METADATA_TMDB_API_KEY` | （空） | TMDb API 密钥 |
 | `METADATA_BGM_API_KEY` | （空） | Bangumi API 密钥 |
 | `METADATA_AI_API_KEY` | （空） | AI API 密钥（OpenAI 兼容） |

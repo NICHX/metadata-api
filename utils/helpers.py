@@ -387,6 +387,7 @@ def extract_episode_number(pure_name, guess_data=None, ai_data=None):
         r"(?i)第\s*0*(\d{1,4})\s*[集话話]\b",
         r"(?i)[\[\(（]\s*0*(\d{1,4})(?:v\d+)?\s*[\]\)）]",
         r"(?i)-\s*0*(\d{1,4})(?:v\d+)?(?=\s*(?:$|[\[\(（]))",
+        r"(?i)(?<=[\u4e00-\u9fff])0*(\d{1,4})\s*$",
     ]
 
     for idx, pattern in enumerate(patterns):
@@ -602,6 +603,7 @@ def derive_title_from_filename(pure_name):
     text = re.sub(r"(?i)\bEP?\s*\d{1,4}\b.*$", "", text)
     text = re.sub(r"(?i)第\s*\d{1,4}\s*[集话話].*$", "", text)
     text = re.sub(r"(?i)[\[\(（]\s*\d{1,4}(?:v\d+)?\s*[\]\)）]\s*$", "", text)
+    text = re.sub(r"(?i)(?<=[\u4e00-\u9fff])\d{1,4}\s*$", "", text)
     return clean_search_title(text)
 
 
@@ -1100,31 +1102,27 @@ def save_image(path, url_part):
         logging.error(f"保存图片失败 {path}: {err}")
 
 
-async def async_save_image(path, url_part):
-    if not url_part:
+async def async_save_image(path, url, timeout=15):
+    """异步下载并保存图片"""
+    if not url or not path:
         return
+    if isinstance(url, str) and url.startswith("http"):
+        full_url = url
+    elif isinstance(url, str) and url.startswith("/"):
+        full_url = "https://image.tmdb.org/t/p/original" + url
+    else:
+        full_url = "https://image.tmdb.org/t/p/original" + str(url)
 
     try:
-        url = (
-            url_part
-            if url_part.startswith("http")
-            else f"https://image.tmdb.org/t/p/original{url_part}"
-        )
-        if os.path.exists(path):
-            return
-
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         async with _image_semaphore_async:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                res = await client.get(
-                    url,
-                    headers={"User-Agent": "Mozilla/5.0"},
-                    follow_redirects=True,
-                )
-                if res.status_code == 200:
-                    with open(path, "wb") as f:
-                        f.write(res.content)
-    except Exception as err:
-        logging.error(f"保存图片失败 {path}: {err}")
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                resp = await client.get(full_url)
+                resp.raise_for_status()
+                with open(path, "wb") as f:
+                    f.write(resp.content)
+    except Exception as e:
+        logger.warning("保存图片失败: path=%s, error=%s", path, e)
 
 
 def write_nfo(path, data, nfo_type="movie"):

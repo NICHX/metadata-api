@@ -289,10 +289,9 @@ async def manual_scrape(request: ManualScrapeRequest = Body(...)):
     from api.schemas.media import EpisodeMetadata
     from api.services.media_operations_service import MediaOperationsService
     from db.tmdb_api import fetch_tmdb_candidates_raw_async, fetch_tmdb_credits_async, fetch_tmdb_episode_meta_async
-    from utils.helpers import candidate_to_result, extract_year_from_release, async_save_image, extract_episode_number
+    from utils.helpers import candidate_to_result, extract_year_from_release, async_save_image
     from api.config import settings
     import re
-    from guessit import guessit
 
     media_category = request.media_category
     collection_id = request.collection_id
@@ -464,10 +463,9 @@ async def manual_scrape(request: ManualScrapeRequest = Body(...)):
             # 解析文件名获取季/集信息（仅 TV 剧集），获取剧照
             if not media_category and (candidate.get("is_tv") or request.media_type == "tv"):
                 try:
-                    pure_name, _ = os.path.splitext(file_info.name)
-                    guess_data = guessit(pure_name)
-                    ep_season = guess_data.get("season")
-                    ep_episode = extract_episode_number(pure_name, guess_data)
+                    parse_result = await asyncio.to_thread(RecognitionService.parse_filename, file_info.name)
+                    ep_season = parse_result.season
+                    ep_episode = parse_result.episode
                     if ep_season and ep_episode:
                         metadata.season = ep_season
                         metadata.episode = ep_episode
@@ -489,6 +487,7 @@ async def manual_scrape(request: ManualScrapeRequest = Body(...)):
                 metadata,
                 download_images=request.download_images,
                 write_nfo_flag=request.write_nfo,
+                overwrite=True,
             )
 
             item.nfo_written = sidecar_result.get("nfo_written", [])
@@ -554,14 +553,19 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
     async def generate_manual_results():
         total = len(request.files)
         yield json.dumps({"type": "progress", "message": f"开始手动刮削 {total} 个文件..."}) + "\n"
+        _started = 0
+        _tmdb_cache_by_id = {}
+        _tmdb_cache_credits = {}
+        _tmdb_cache_season = {}
+        _tmdb_cache_collection = {}
 
         from api.schemas.media import EpisodeMetadata
         from api.services.media_operations_service import MediaOperationsService
         from db.tmdb_api import fetch_tmdb_candidates_raw_async, fetch_tmdb_credits_async, fetch_tmdb_episode_meta_async
-        from utils.helpers import candidate_to_result, extract_year_from_release, async_save_image, extract_episode_number
+        from utils.helpers import candidate_to_result, extract_year_from_release, async_save_image
         from api.config import settings
+        from utils.log_buffer import push_log
         import re
-        from guessit import guessit
 
         media_category = request.media_category
         collection_id = request.collection_id
@@ -569,6 +573,9 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
         tv_id = request.tv_id
 
         async def _process_one(idx, file_info):
+            nonlocal _started
+            _started += 1
+            await push_log(f"[{idx}/{total}] 开始处理: {file_info.name}")
             item = ManualScrapeItem(
                 original_path=file_info.path,
                 original_name=file_info.name,
@@ -589,9 +596,12 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
                         item.status = "缺少合集ID"
                         item.errors.append("合集刮削需要提供合集ID")
                         return idx, item
-                    coll_title, cid, coll_msg, coll_meta = await fetch_tmdb_collection_by_id_async(
-                        str(cid_to_use), api_key=settings.tmdb_api_key
-                    )
+                    _cache_key_coll = f"coll:{cid_to_use}"
+                    if _cache_key_coll not in _tmdb_cache_collection:
+                        _tmdb_cache_collection[_cache_key_coll] = await fetch_tmdb_collection_by_id_async(
+                            str(cid_to_use), api_key=settings.tmdb_api_key
+                        )
+                    coll_title, cid, coll_msg, coll_meta = _tmdb_cache_collection[_cache_key_coll]
                     if cid == "None":
                         item.status = "合集ID无效"
                         item.errors.append("TMDb 未找到该合集")
@@ -620,9 +630,12 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
                         item.status = "剧集ID无效"
                         item.errors.append("TMDb 未找到该剧集")
                         return idx, item
-                    season_data = await fetch_tmdb_season_data_async(
-                        str(tv_id_to_use), season_num_to_use, settings.tmdb_api_key
-                    )
+                    _cache_key_season = f"season:{tv_id_to_use}:{season_num_to_use}"
+                    if _cache_key_season not in _tmdb_cache_season:
+                        _tmdb_cache_season[_cache_key_season] = await fetch_tmdb_season_data_async(
+                            str(tv_id_to_use), season_num_to_use, settings.tmdb_api_key
+                        )
+                    season_data = _tmdb_cache_season[_cache_key_season]
                     if not season_data:
                         item.status = "季数据获取失败"
                         item.errors.append("TMDb 未找到该季信息")
@@ -655,9 +668,12 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
                     if request.tmdb_id:
                         from db.tmdb_api import fetch_tmdb_by_id_raw_async
                         is_tv = request.media_type == "tv"
-                        id_title, cid, id_msg, id_meta = await fetch_tmdb_by_id_raw_async(
-                            str(request.tmdb_id), is_tv=is_tv, api_key=settings.tmdb_api_key
-                        )
+                        _cache_key_id = f"by_id:{request.tmdb_id}:{is_tv}"
+                        if _cache_key_id not in _tmdb_cache_by_id:
+                            _tmdb_cache_by_id[_cache_key_id] = await fetch_tmdb_by_id_raw_async(
+                                str(request.tmdb_id), is_tv=is_tv, api_key=settings.tmdb_api_key
+                            )
+                        id_title, cid, id_msg, id_meta = _tmdb_cache_by_id[_cache_key_id]
                         if cid != "None":
                             candidates = [{
                                 "title": id_title, "alt_title": id_meta.get("original_title", ""),
@@ -722,9 +738,12 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
                     is_tv_type = candidate.get("is_tv", False) or request.media_type == "tv"
                     t_id = str(candidate.get("id", ""))
                     if t_id and t_id != "None":
-                        actors, directors = await fetch_tmdb_credits_async(
-                            t_id, is_tv=is_tv_type, api_key=settings.tmdb_api_key
-                        )
+                        _cache_key_cred = f"cred:{t_id}:{is_tv_type}"
+                        if _cache_key_cred not in _tmdb_cache_credits:
+                            _tmdb_cache_credits[_cache_key_cred] = await fetch_tmdb_credits_async(
+                                t_id, is_tv=is_tv_type, api_key=settings.tmdb_api_key
+                            )
+                        actors, directors = _tmdb_cache_credits[_cache_key_cred]
                         metadata.actors = actors
                         metadata.directors = directors
                 except Exception:
@@ -732,10 +751,9 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
 
                 if not media_category and (candidate.get("is_tv") or request.media_type == "tv"):
                     try:
-                        pure_name, _ = os.path.splitext(file_info.name)
-                        guess_data = guessit(pure_name)
-                        ep_season = guess_data.get("season")
-                        ep_episode = extract_episode_number(pure_name, guess_data)
+                        parse_result = await asyncio.to_thread(RecognitionService.parse_filename, file_info.name)
+                        ep_season = parse_result.season
+                        ep_episode = parse_result.episode
                         if ep_season and ep_episode:
                             metadata.season = ep_season
                             metadata.episode = ep_episode
@@ -761,6 +779,7 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
                     file_info.path, metadata,
                     download_images=request.download_images,
                     write_nfo_flag=request.write_nfo,
+                    overwrite=True,
                 )
 
                 item.nfo_written = sidecar_result.get("nfo_written", [])
@@ -801,33 +820,42 @@ async def manual_scrape_stream(request: ManualScrapeRequest = Body(...)):
 
         tasks = [_process_one(idx, file_info) for idx, file_info in enumerate(request.files, 1)]
         completed = 0
-        for coro in asyncio.as_completed(tasks):
-            try:
-                idx, item = await asyncio.wait_for(coro, timeout=120.0)
-            except asyncio.TimeoutError:
+        pending = {asyncio.create_task(t) for t in tasks}
+        while pending:
+            done, pending = await asyncio.wait(pending, timeout=2.0, return_when=asyncio.FIRST_COMPLETED)
+            if not done:
+                yield json.dumps({"type": "progress", "message": f"正在获取数据... 已启动 {_started}/{total} 个"}) + "\n"
                 continue
-            except Exception:
-                continue
-            completed += 1
-            yield json.dumps({
-                "type": "result",
-                "index": idx,
-                "total": total,
-                "success": item.success,
-                "data": {
+            for coro in done:
+                try:
+                    idx, item = await asyncio.wait_for(coro, timeout=120.0)
+                except asyncio.TimeoutError:
+                    continue
+                except Exception:
+                    continue
+                completed += 1
+                status_icon = "✅" if item.success else "❌"
+                await push_log(f"[{idx}/{total}] {status_icon} {item.original_name}: {item.status}")
+                yield json.dumps({
+                    "type": "result",
+                    "index": idx,
+                    "total": total,
                     "success": item.success,
-                    "original_path": item.original_path,
-                    "original_name": item.original_name,
-                    "recognized_title": item.recognized_title,
-                    "status": item.status,
-                    "nfo_written": item.nfo_written,
-                    "images_downloaded": item.images_downloaded,
-                    "errors": item.errors,
-                    "actors_count": item.actors_count,
-                    "directors": item.directors,
-                }
-            }) + "\n"
+                    "data": {
+                        "success": item.success,
+                        "original_path": item.original_path,
+                        "original_name": item.original_name,
+                        "recognized_title": item.recognized_title,
+                        "status": item.status,
+                        "nfo_written": item.nfo_written,
+                        "images_downloaded": item.images_downloaded,
+                        "errors": item.errors,
+                        "actors_count": item.actors_count,
+                        "directors": item.directors,
+                    }
+                }) + "\n"
 
+        await push_log(f"✅ 手动刮削完成: {total} 个文件")
         yield json.dumps({
             "type": "complete",
             "total": total,
@@ -886,63 +914,123 @@ async def scrape_metadata_stream(request: ScrapeRequest = Body(...)):
     
     async def generate_scrape_results():
         total = len(request.files)
+        from utils.log_buffer import push_log
 
         yield json.dumps({"type": "progress", "message": "准备中 — AI 预加载..."}) + "\n"
+        await push_log(f"开始批量刮削 {total} 个文件...")
         await prepopulate_ai_cache(request.files)
-        yield json.dumps({"type": "progress", "message": f"AI 预加载完成，开始刮削 {total} 个文件..."}) + "\n"
+        yield json.dumps({"type": "progress", "message": f"AI 预加载完成，开始匹配 {total} 个文件..."}) + "\n"
+        await push_log(f"AI 预加载完成，开始匹配 {total} 个文件...")
 
-        async def _process_one(idx, file_info):
+        # Phase 1: 识别匹配阶段（逐文件输出进度）
+        recog_results: dict = {}
+
+        async def _recog_one(idx, file_info):
             try:
-                result = await MediaOperationsService.scrape_metadata(
-                    file_info=file_info,
+                recog = await RecognitionService.recognize_media(
+                    filename=file_info.name,
+                    filepath=file_info.path,
                     source=request.source,
+                    group_id=file_info.group_id,
+                )
+                return idx, recog
+            except Exception as e:
+                return idx, None
+
+        recog_tasks = [_recog_one(idx, file_info) for idx, file_info in enumerate(request.files, 1)]
+        for coro in asyncio.as_completed(recog_tasks):
+            idx, recog = await coro
+            recog_results[idx] = recog
+            file_info = request.files[idx - 1]
+            title = recog.recognized_title if recog and recog.success else "❌ 未匹配"
+            yield json.dumps({
+                "type": "progress",
+                "message": f"[{len(recog_results)}/{total}] 匹配: {file_info.name} → {title}"
+            }) + "\n"
+            await push_log(f"[{len(recog_results)}/{total}] 匹配: {file_info.name} → {title}")
+
+        yield json.dumps({"type": "progress", "message": f"匹配完成，开始刮削 {total} 个文件..."}) + "\n"
+        await push_log(f"匹配完成，开始刮削 {total} 个文件...")
+
+        # Phase 2: 刮削阶段（复用识别结果）
+        async def _scrape_one(idx, file_info):
+            try:
+                recog = recog_results.get(idx)
+                if not recog or not recog.success or not recog.metadata:
+                    return idx, {
+                        "success": False,
+                        "original_path": file_info.path,
+                        "original_name": file_info.name,
+                        "recognized_title": recog.recognized_title if recog else "",
+                        "status": "识别失败，无法刮削",
+                        "errors": [recog.status if recog else "识别失败"],
+                    }, None
+                result = await MediaOperationsService._write_sidecar_files(
+                    file_info.path,
+                    recog.metadata,
                     download_images=request.download_images,
                     write_nfo_flag=request.write_nfo
                 )
+                result["recognized_title"] = recog.recognized_title
+                result["match_id"] = recog.match_id
+                result["original_path"] = file_info.path
+                result["original_name"] = file_info.name
+                result["success"] = len(result.get("errors", [])) == 0
+                result["status"] = "刮削完成" if result["success"] else "部分完成"
                 return idx, result, None
             except Exception as e:
                 return idx, None, e
 
-        tasks = [_process_one(idx, file_info) for idx, file_info in enumerate(request.files, 1)]
-        for coro in asyncio.as_completed(tasks):
-            idx, result, error = await coro
-            file_info = request.files[idx - 1]
+        tasks = [_scrape_one(idx, file_info) for idx, file_info in enumerate(request.files, 1)]
+        pending = {asyncio.create_task(t) for t in tasks}
+        completed_scrape = 0
+        while pending:
+            done, pending = await asyncio.wait(pending, timeout=2.0, return_when=asyncio.FIRST_COMPLETED)
+            if not done:
+                yield json.dumps({"type": "progress", "message": f"刮削中... 已完成 {completed_scrape}/{total} 个"}) + "\n"
+                continue
+            for coro in done:
+                idx, result, error = await coro
+                file_info = request.files[idx - 1]
 
-            if error:
-                yield json.dumps({
-                    "type": "result",
-                    "index": idx,
-                    "total": total,
-                    "success": False,
-                    "data": {
+                if error:
+                    yield json.dumps({
+                        "type": "result",
+                        "index": idx,
+                        "total": total,
                         "success": False,
-                        "original_path": file_info.path,
-                        "original_name": file_info.name,
-                        "status": f"刮削失败: {str(error)}",
-                        "errors": [str(error)],
-                    }
-                }) + "\n"
-            else:
-                yield json.dumps({
-                    "type": "result",
-                    "index": idx,
-                    "total": total,
-                    "success": result.get("success", False),
-                    "data": {
+                        "data": {
+                            "success": False,
+                            "original_path": file_info.path,
+                            "original_name": file_info.name,
+                            "status": f"刮削失败: {str(error)}",
+                            "errors": [str(error)],
+                        }
+                    }) + "\n"
+                    await push_log(f"❌ [{idx}/{total}] {file_info.name}: 刮削失败: {str(error)}")
+                else:
+                    yield json.dumps({
+                        "type": "result",
+                        "index": idx,
+                        "total": total,
                         "success": result.get("success", False),
-                        "original_path": result.get("original_path", ""),
-                        "original_name": result.get("original_name", ""),
-                        "recognized_title": result.get("recognized_title", ""),
-                        "match_id": result.get("match_id", ""),
-                        "status": result.get("status", ""),
-                        "nfo_written": result.get("nfo_written", []),
-                        "images_downloaded": result.get("images_downloaded", []),
-                        "errors": result.get("errors", []),
-                    }
-                }) + "\n"
-            
-            await asyncio.sleep(0.01)
-        
+                        "data": {
+                            "success": result.get("success", False),
+                            "original_path": result.get("original_path", ""),
+                            "original_name": result.get("original_name", ""),
+                            "recognized_title": result.get("recognized_title", ""),
+                            "match_id": result.get("match_id", ""),
+                            "status": result.get("status", ""),
+                            "nfo_written": result.get("nfo_written", []),
+                            "images_downloaded": result.get("images_downloaded", []),
+                            "errors": result.get("errors", []),
+                        }
+                    }) + "\n"
+                    await push_log(f"✅ [{idx}/{total}] {result.get('recognized_title', '')}: {result.get('status', '刮削完成')}")
+
+                completed_scrape += 1
+                await asyncio.sleep(0.01)
+
         # 发送完成消息
         token_usage_list = get_and_reset_token_usage()
         complete_msg = {"type": "complete", "total": total}
@@ -960,6 +1048,7 @@ async def scrape_metadata_stream(request: ScrapeRequest = Body(...)):
                 "cost_cache_hit": costs["cache_hit"],
             }
         yield json.dumps(complete_msg) + "\n"
+        await push_log(f"✅ 批量刮削完成: {total} 个文件")
     
     return StreamingResponse(
         generate_scrape_results(),
@@ -1065,6 +1154,9 @@ async def organize_files(request: OrganizeRequest = Body(...)):
 
 TMDB_IMAGE_HOST = "image.tmdb.org"
 
+_image_cache: dict[str, tuple[bytes, str]] = {}
+_image_cache_lock = asyncio.Lock()
+
 
 @router.get("/image")
 async def get_image(
@@ -1074,6 +1166,11 @@ async def get_image(
     """代理 TMDb 图片，客户端直接通过此接口获取海报等图片"""
     if not path:
         raise HTTPException(status_code=400, detail="缺少图片路径参数 path")
+    cache_key = f"{size}:{path}"
+    async with _image_cache_lock:
+        if cache_key in _image_cache:
+            content, media_type = _image_cache[cache_key]
+            return Response(content=content, media_type=media_type)
     if path.startswith("http"):
         from urllib.parse import urlparse
         parsed = urlparse(path)
@@ -1086,7 +1183,13 @@ async def get_image(
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(image_url, follow_redirects=True)
             resp.raise_for_status()
-            return Response(content=resp.content, media_type=resp.headers.get("content-type", "image/jpeg"))
+            content = resp.content
+            media_type = resp.headers.get("content-type", "image/jpeg")
+        async with _image_cache_lock:
+            if len(_image_cache) > 200:
+                _image_cache.clear()
+            _image_cache[cache_key] = (content, media_type)
+        return Response(content=content, media_type=media_type)
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"获取图片失败: {str(e)}")
 

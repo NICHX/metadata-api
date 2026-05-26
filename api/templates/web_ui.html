@@ -323,6 +323,13 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
         <button class="btn btn-outline" id="btnClearScrapeSelection" style="display: none;">清空选择</button>
     </div>
     <div id="batchScrapeResult" class="result-box info" style="display:none"></div>
+    <div id="server-log-panel-scrape" style="display:none;margin-top:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;cursor:pointer;user-select:none" onclick="toggleServerLog('scrape')">
+        <span style="font-size:12px;color:var(--text-light)">📋 服务端日志</span>
+        <span id="server-log-arrow-scrape" style="font-size:10px;color:var(--text-light)">▶</span>
+      </div>
+      <div id="server-log-container-scrape" style="display:none;background:#1e2a3a;color:#d4d4d4;border-radius:6px;padding:8px;font-family:'SF Mono',Consolas,monospace;font-size:11px;line-height:1.5;max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all"></div>
+    </div>
   </div>
 </div>
 
@@ -429,6 +436,13 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
     <div id="manual-scrape-time" style="color:#7f8c9b;font-size:12px"></div>
     <div id="manual-scrape-logs" style="margin-top:12px;font-size:13px;line-height:1.6;display:none"></div>
     <div id="manual-scrape-actions" style="margin-top:12px;display:none"></div>
+  </div>
+  <div id="server-log-panel-manual" style="display:none;margin-top:8px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;cursor:pointer;user-select:none" onclick="toggleServerLog('manual')">
+      <span style="font-size:12px;color:var(--text-light)">📋 服务端日志</span>
+      <span id="server-log-arrow-manual" style="font-size:10px;color:var(--text-light)">▶</span>
+    </div>
+    <div id="server-log-container-manual" style="display:none;background:#1e2a3a;color:#d4d4d4;border-radius:6px;padding:8px;font-family:'SF Mono',Consolas,monospace;font-size:11px;line-height:1.5;max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all"></div>
   </div>
           </div>
 
@@ -670,6 +684,10 @@ textarea { resize: vertical; min-height: 60px; font-family: "SF Mono", Consolas,
 
 <script>
 const BASE = "";
+const AUTH_KEY = {{ auth_key | tojson }};
+if (AUTH_KEY) {
+  localStorage.setItem("authKey", AUTH_KEY);
+}
 
 // 全局状态
 let currentBrowserPath = "";
@@ -907,7 +925,7 @@ async function scanMultipleDirectories(dirList) {
           try {
             const data = JSON.parse(line);
             if (data.type === "complete") {
-              allFiles.push(...data.media_files.map(f => ({ path: f.path, name: f.name, size: f.size, groupId: f.group_id })));
+              allFiles.push(...data.media_files.map(f => ({ path: f.path, name: f.name, size: f.size, groupId: f.group_id, sourceDir: dir })));
               if (progressEl) progressEl.textContent = `完成！${dir.split("/").pop()} 中找到 ${data.total_count} 个文件`;
             } else if (data.type === "error") {
               throw new Error(data.message);
@@ -968,7 +986,7 @@ function expandAllGroups() {
 
 function removeGroup(encodedGid) {
   const gid = decodeURIComponent(encodedGid);
-  scannedScrapeFiles = scannedScrapeFiles.filter(f => (f.groupId || "__ungrouped__") !== gid);
+  scannedScrapeFiles = scannedScrapeFiles.filter(f => (f.sourceDir || f.groupId || "__ungrouped__") !== gid);
   delete _groupCollapseState[gid];
   updateScannedScrapeFilesDisplay();
 }
@@ -986,10 +1004,10 @@ function updateScannedScrapeFilesDisplay() {
     clearBtn.style.display = "inline-flex";
     countEl.textContent = `已选择 ${scannedScrapeFiles.length} 个文件`;
     
-    // 按 groupId 分组
+    // 按来源目录分组
     const groups = {};
     for (const file of scannedScrapeFiles) {
-      const gid = file.groupId || "__ungrouped__";
+      const gid = file.sourceDir || file.groupId || "__ungrouped__";
       if (!groups[gid]) groups[gid] = { name: gid === "__ungrouped__" ? "其他" : gid.split("/").pop() || gid, files: [] };
       groups[gid].files.push(file);
     }
@@ -1265,6 +1283,7 @@ let _batchResults = [];
 
 // ===== 手动刮削 =====
 let manualSelectedFiles = [];
+let _manualSearchResults = [];
 let manualSelectedMatch = null;
 
 function manualSelectFile() {
@@ -1502,6 +1521,7 @@ async function manualSearch() {
     }
 
     countEl.textContent = `共 ${data.results.length} 条结果`;
+    _manualSearchResults = data.results;
     listEl.innerHTML = data.results.map(r => {
       const typeForLabel = r.type;
       const cat = r.media_category || "";
@@ -1552,6 +1572,37 @@ function manualSelectMatch(id, title, year, type, mediaCategory, seasonNumber) {
   const files = manualSelectedFiles;
   if (!files.length) { alert("请先选择要刮削的文件"); return; }
 
+  // 从缓存中查找完整结果数据
+  const result = _manualSearchResults.find(r => r.id === id) || {};
+  const poster = result.poster || "";
+  const rating = result.rating || "";
+  const overview = result.overview || "";
+
+  const listEl = document.getElementById("manual-search-list");
+  const countEl = document.getElementById("manual-search-count");
+
+  const posterHtml = poster
+    ? `<img class="search-result-poster" src="/api/v1/media/image?path=${encodeURIComponent(poster)}&size=w92" alt="" onerror="this.style.display='none'">`
+    : `<div class="search-result-poster-placeholder">🎬</div>`;
+  const ratingHtml = rating ? `<span class="search-result-rating">⭐ ${Number(rating).toFixed(1)}</span>` : "";
+  const yearHtml = year ? `<span class="search-result-year">${year}</span>` : "";
+  const overviewHtml = overview ? `<div class="search-result-overview">${escapeHtml(overview)}</div>` : "";
+
+  listEl.innerHTML = `<div class="search-result-card" style="opacity:0.85">
+    ${posterHtml}
+    <div class="search-result-info">
+      <div class="search-result-title">
+        <span class="search-result-title-text" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+        <span class="search-result-badge ${type === 'tv' ? 'tv' : 'movie'}">${type === 'tv' ? '📺 剧集' : '🎬 电影'}</span>
+        ${yearHtml}
+        ${ratingHtml}
+        <span style="color:var(--success);margin-left:8px;font-size:13px">✅ 已选择</span>
+      </div>
+      ${overviewHtml}
+    </div>
+  </div>`;
+  countEl.textContent = `已选择: ${escapeHtml(title)}`;
+
   showManualProgress(files, id, title, year, type, mediaCategory, seasonNumber);
 }
 
@@ -1581,6 +1632,9 @@ async function showManualProgress(files, tmdbId, title, year, type, mediaCategor
   barFill.style.width = "0%";
   logEl.innerHTML = "";
 
+  document.getElementById("server-log-panel-manual").style.display = "block";
+  startServerLog("server-log-container-manual");
+
   const _startTime = Date.now();
   timeEl.textContent = "⏱ 用时: 0s";
   const _timerInterval = setInterval(() => {
@@ -1608,8 +1662,8 @@ async function showManualProgress(files, tmdbId, title, year, type, mediaCategor
         title: title,
         year: year || null,
         media_type: type,
-        download_images: opts.download_images || opts.download_fanart,
-        write_nfo: opts.write_nfo,
+        download_images: true,
+        write_nfo: true,
         download_actor_images: opts.download_actor_images,
         media_category: mediaCategory || null,
         season_number: seasonNumber || null,
@@ -1646,6 +1700,8 @@ async function showManualProgress(files, tmdbId, title, year, type, mediaCategor
             } else {
               failedCount++;
             }
+          } else if (data.type === "progress") {
+            progressEl.textContent = data.message;
           } else if (data.type === "complete") {
             clearInterval(_timerInterval);
             const elapsed = Math.round((Date.now() - _startTime) / 1000);
@@ -1726,6 +1782,7 @@ async function showManualProgress(files, tmdbId, title, year, type, mediaCategor
             } else {
               progressArea.className = "result-box warning";
             }
+            stopServerLog();
           }
         } catch (e) {
           // ignore parse errors for incomplete lines
@@ -1736,6 +1793,7 @@ async function showManualProgress(files, tmdbId, title, year, type, mediaCategor
     clearInterval(_timerInterval);
     progressEl.textContent = `❌ 请求失败: ${escapeHtml(e.message)}`;
     progressArea.className = "result-box error";
+    stopServerLog();
   }
 }
 
@@ -1885,6 +1943,8 @@ async function batchScrape() {
   el.style.display = "block";
   el.className = "result-box info";
   el.innerHTML = '<div style="margin-bottom: 8px; font-weight: 600;">正在刮削...</div><div id="scrapeProgress" style="color: #7f8c9b; font-size: 13px;"></div><div class="progress-bar"><div class="progress-bar-fill" id="scrapeProgressBarFill"></div></div><div id="scrapeTime" style="color: #7f8c9b; font-size: 12px;"></div><div id="scrapeLogs" style="margin-top: 12px; font-size: 13px; line-height: 1.6; display: none;"></div><div id="scrapeActions" style="margin-top: 12px; display: none;"></div><div id="scrapeTokenUsage" style="margin-top: 8px; font-size: 12px;"></div>';
+  document.getElementById("server-log-panel-scrape").style.display = "block";
+  startServerLog("server-log-container-scrape");
 
   const progressEl = document.getElementById("scrapeProgress");
   const logsEl = document.getElementById("scrapeLogs");
@@ -2103,6 +2163,7 @@ async function batchScrape() {
     _scrapeAbortController = null;
     document.getElementById("batchScrapeBtn").style.display = "inline-flex";
     document.getElementById("stopScrapeBtn").style.display = "none";
+    stopServerLog();
   }
 }
 
@@ -2301,6 +2362,60 @@ async function clearCache() {
   } catch (e) {
     show(el, e.message, "error");
   }
+}
+
+// ===== 服务端实时日志（刮削进度下方显示） =====
+let _serverLogSource = null;
+let _serverLogBuffer = [];
+let _serverLogContainerId = null;
+
+function startServerLog(containerId) {
+  stopServerLog();
+  _serverLogContainerId = containerId;
+  _serverLogBuffer = [];
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '<div style="color:#888">等待服务端日志...</div>';
+  container.style.display = "block";
+
+  _serverLogSource = new EventSource(BASE + "/api/v1/media/logs/stream");
+  _serverLogSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      const logs = data.logs || [];
+      if (logs.length !== _serverLogBuffer.length) {
+        _serverLogBuffer = logs;
+        renderServerLog();
+      }
+    } catch (e) {}
+  };
+  _serverLogSource.onerror = () => {};
+}
+
+function stopServerLog() {
+  if (_serverLogSource) {
+    _serverLogSource.close();
+    _serverLogSource = null;
+  }
+}
+
+function renderServerLog() {
+  if (!_serverLogContainerId) return;
+  const container = document.getElementById(_serverLogContainerId);
+  if (!container) return;
+  const visible = _serverLogBuffer.slice(-30);
+  container.innerHTML = visible.map(l => escapeHtml(l)).join("\n");
+  container.scrollTop = container.scrollHeight;
+}
+
+function toggleServerLog(panel) {
+  const container = document.getElementById("server-log-container-" + panel);
+  const arrow = document.getElementById("server-log-arrow-" + panel);
+  if (!container) return;
+  const isHidden = container.style.display === "none";
+  container.style.display = isHidden ? "block" : "none";
+  if (arrow) arrow.textContent = isHidden ? "▾" : "▶";
+  if (isHidden) startServerLog("server-log-container-" + panel);
 }
 
 // Init

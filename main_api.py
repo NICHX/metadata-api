@@ -10,6 +10,9 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
+# 抑制 httpx 的 INFO 级请求日志，避免大量并发日志导致阻塞
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 def main():
     parser = argparse.ArgumentParser(

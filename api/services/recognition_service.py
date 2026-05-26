@@ -66,6 +66,8 @@ class RecognitionService:
         title = guess_data.get("title", derive_title_from_filename(pure_name))
         year = guess_data.get("year")
         season = guess_data.get("season", 1)
+        if season and isinstance(season, int) and 1900 <= season <= 2099:
+            season = 1
         episode = extract_episode_number(pure_name, guess_data)
         logger.info("解析文件名: filename=%s, title=%s, year=%s, season=%s, episode=%s",
                      filename, title, year, season, episode)
@@ -111,14 +113,14 @@ class RecognitionService:
         elif filepath:
             logger.warning("AI API密钥未配置，将跳过AI辅助标题推断，如需使用请在设置中配置AI API Key")
 
+        primary = clean_search_title(guess_title or "")
+        if primary:
+            queries.append(primary)
+
         if ai_title_from_parse:
             ai_cleaned = clean_search_title(ai_title_from_parse)
-            if ai_cleaned:
+            if ai_cleaned and ai_cleaned.lower() not in [q.lower() for q in queries]:
                 queries.append(ai_cleaned)
-
-        primary = clean_search_title(guess_title or "")
-        if primary and primary.lower() not in [q.lower() for q in queries]:
-            queries.append(primary)
 
         bracket_titles = RecognitionService._extract_bracket_titles(pure_name)
         for bt in bracket_titles:

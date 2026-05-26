@@ -173,7 +173,8 @@ class MediaOperationsService:
         target_path: str,
         metadata: EpisodeMetadata,
         download_images: bool = True,
-        write_nfo_flag: bool = True
+        write_nfo_flag: bool = True,
+        overwrite: bool = False
     ) -> Dict[str, Any]:
         """写入 NFO 文件并下载图片"""
         result = {
@@ -207,7 +208,7 @@ class MediaOperationsService:
                 if media_type != "season":
                     # 常规剧集 NFO
                     ep_nfo = os.path.splitext(target_path)[0] + ".nfo"
-                    if write_nfo_flag and not os.path.exists(ep_nfo):
+                    if write_nfo_flag and (overwrite or not os.path.exists(ep_nfo)):
                         nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "episode")
                         write_nfo(ep_nfo, nfo_data, "episodedetails")
                         result["nfo_written"].append(ep_nfo)
@@ -216,7 +217,7 @@ class MediaOperationsService:
                     thumb_source = metadata.still or metadata.s_poster or metadata.poster
                     if thumb_source and download_images:
                         thumb_path = os.path.splitext(target_path)[0] + "-thumb.jpg"
-                        if not os.path.exists(thumb_path):
+                        if overwrite or not os.path.exists(thumb_path):
                             image_tasks.append((thumb_path, thumb_source))
 
                 # 季和剧集文件夹处理
@@ -239,56 +240,56 @@ class MediaOperationsService:
 
                 # 季 NFO
                 s_nfo_root = os.path.join(root_d, f"season{s_fmt}.nfo")
-                if write_nfo_flag and not os.path.exists(s_nfo_root):
+                if write_nfo_flag and (overwrite or not os.path.exists(s_nfo_root)):
                     nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "season")
                     write_nfo(s_nfo_root, nfo_data, "season")
                     result["nfo_written"].append(s_nfo_root)
 
                 if metadata.s_poster and download_images:
                     s_poster_root = os.path.join(root_d, f"season{s_fmt}-poster.jpg")
-                    if not os.path.exists(s_poster_root):
+                    if overwrite or not os.path.exists(s_poster_root):
                         image_tasks.append((s_poster_root, metadata.s_poster))
 
                 # 季文件夹内的文件
                 if is_season_folder:
                     season_nfo_local = os.path.join(cur_dir, "season.nfo")
-                    if write_nfo_flag and not os.path.exists(season_nfo_local):
+                    if write_nfo_flag and (overwrite or not os.path.exists(season_nfo_local)):
                         nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "season")
                         write_nfo(season_nfo_local, nfo_data, "season")
                         result["nfo_written"].append(season_nfo_local)
 
                     folder_jpg_local = os.path.join(cur_dir, "folder.jpg")
-                    if metadata.s_poster and download_images and not os.path.exists(folder_jpg_local):
+                    if metadata.s_poster and download_images and (overwrite or not os.path.exists(folder_jpg_local)):
                         image_tasks.append((folder_jpg_local, metadata.s_poster))
 
                 # 电视节目 NFO 和海报
                 tvshow_nfo = os.path.join(root_d, "tvshow.nfo")
-                if write_nfo_flag and (not os.path.exists(tvshow_nfo) or MediaOperationsService._nfo_has_empty_plot(tvshow_nfo)):
+                if write_nfo_flag and (overwrite or not os.path.exists(tvshow_nfo) or MediaOperationsService._nfo_has_empty_plot(tvshow_nfo)):
                     nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "tvshow")
                     write_nfo(tvshow_nfo, nfo_data, "tvshow")
                     result["nfo_written"].append(tvshow_nfo)
 
                 if metadata.poster and download_images:
                     poster_path = os.path.join(root_d, "poster.jpg")
-                    if not os.path.exists(poster_path):
+                    if overwrite or not os.path.exists(poster_path):
                         image_tasks.append((poster_path, metadata.poster))
 
             else:
                 # 电影 / 合集 / 纪录片/音乐视频/综艺/短片 处理
                 movie_nfo = os.path.splitext(target_path)[0] + ".nfo"
-                if write_nfo_flag and not os.path.exists(movie_nfo):
+                if write_nfo_flag and (overwrite or not os.path.exists(movie_nfo)):
                     nfo_data = MediaOperationsService._metadata_to_nfo_data(metadata, "movie")
                     write_nfo(movie_nfo, nfo_data, "movie")
                     result["nfo_written"].append(movie_nfo)
 
                 if metadata.poster and download_images:
                     poster_path = os.path.join(target_dir, "poster.jpg")
-                    if not os.path.exists(poster_path):
+                    if overwrite or not os.path.exists(poster_path):
                         image_tasks.append((poster_path, metadata.poster))
 
                 if metadata.fanart and download_images:
                     fanart_path = os.path.join(target_dir, "fanart.jpg")
-                    if not os.path.exists(fanart_path):
+                    if overwrite or not os.path.exists(fanart_path):
                         image_tasks.append((fanart_path, metadata.fanart))
 
             # 并发下载图片
