@@ -1241,12 +1241,12 @@ async def organize_files(request: OrganizeRequest = Body(...)):
                 meta.ep_title = _ep_title_cache[ep_key]
             else:
                 try:
-                    ep_meta = await fetch_tmdb_episode_meta_async(
+                    ep_title, ep_plot, ep_still = await fetch_tmdb_episode_meta_async(
                         tmdb_id, meta.season, meta.episode, settings.tmdb_api_key
                     )
-                    if ep_meta and ep_meta.get("name"):
-                        _ep_title_cache[ep_key] = ep_meta["name"]
-                        meta.ep_title = ep_meta["name"]
+                    if ep_title:
+                        _ep_title_cache[ep_key] = ep_title
+                        meta.ep_title = ep_title
                     else:
                         _ep_title_cache[ep_key] = ""
                 except Exception:
