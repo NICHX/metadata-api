@@ -28,6 +28,7 @@ from api.services.recognition_service import RecognitionService, prepopulate_ai_
 from api.services.media_operations_service import MediaOperationsService, _estimate_ai_cost
 from api.services.ai_service import get_and_reset_token_usage
 from api.services.hardlink_service import organize_file, DEFAULT_MOVIE_TEMPLATE, DEFAULT_TV_TEMPLATE
+from api.config import settings
 from db.tmdb_api import fetch_tmdb_candidates_async
 
 # TMDb 图片 CDN 基础地址
@@ -1241,7 +1242,7 @@ async def organize_files(request: OrganizeRequest = Body(...)):
             else:
                 try:
                     ep_meta = await fetch_tmdb_episode_meta_async(
-                        tmdb_id, meta.season, meta.episode
+                        tmdb_id, meta.season, meta.episode, settings.tmdb_api_key
                     )
                     if ep_meta and ep_meta.get("name"):
                         _ep_title_cache[ep_key] = ep_meta["name"]

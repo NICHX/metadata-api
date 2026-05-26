@@ -1875,5 +1875,4 @@ function renderServerLog() {
 checkHealth();
 loadAutoWriteConfig();
 loadRoot();
-updateTabStates();
 loadAbout();

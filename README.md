@@ -13,10 +13,13 @@
 - **AI 辅助识别** — 集成 OpenAI 兼容 API（如 DeepSeek），从目录路径推断剧名/电影名
 - **元数据刮削** — 写入 Kodi 标准 NFO 文件（剧集、季、剧集目录）
 - **图片下载** — 自动下载海报、剧照、背景图等
-- **文件系统浏览** — 支持浏览本地目录、扫描媒体文件
+- **文件系统管理** — 浏览本地目录、递归扫描媒体文件
+- **硬链接整理** — 按 `{剧名 (年份)/Season NN/剧名 - SNNENN.ext` 格式硬链接/复制到目标媒体库
 - **批量处理** — 批量识别 + 批量刮削，支持流式实时返回结果
-- **Web UI** — 内置浏览器界面，开箱即用
-- **双模式部署** — 本地模式（完整文件操作） / 远程模式（仅 API）
+- **Web UI** — 内置浏览器界面，CSS/JS 外部分离，开箱即用
+- **双模式部署** — 本地模式（完整文件操作）/ 远程模式（仅 API）
+- **双认证机制** — Header 认证（API 请求） + Session 认证（Web UI 登录）
+- **TMDb 防护** — 未配置 TMDb API Key 时自动禁用硬链接/刮削功能
 - **智能缓存** — 多层级缓存（API 结果、AI 结果），减少重复请求
 - **API 限流** — 针对 TMDb / BGM 接口内置令牌桶限流器
 
@@ -85,7 +88,9 @@ docker run -d \
   -e METADATA_MODE=local \
   -e METADATA_AUTH_KEY=your_secret_key \
   -e METADATA_TMDB_API_KEY=your_key \
+  -e MEDIA_LIBRARY=/media/library \
   -v /path/to/media:/media:ro \
+  -v metadata-api-data:/app/data \
   ghcr.io/你的GitHub用户名/metadata-api:latest
 ```
 
@@ -100,7 +105,9 @@ docker run -d \
   -e METADATA_MODE=local \
   -e METADATA_AUTH_KEY=your_secret_key \
   -e METADATA_TMDB_API_KEY=your_key \
+  -e MEDIA_LIBRARY=/media/library \
   -v /path/to/media:/media:ro \
+  -v metadata-api-data:/app/data \
   metadata-api
 ```
 
@@ -128,8 +135,9 @@ Docker Compose 会自动创建 `media-renamer-data` 卷，将配置文件和 API
 | `METADATA_BGM_API_KEY` | （空） | Bangumi API 密钥 |
 | `METADATA_AI_API_KEY` | （空） | AI API 密钥（OpenAI 兼容） |
 | `METADATA_AI_BASE_URL` | `https://api.deepseek.com` | AI API 地址 |
-| `METADATA_AI_MODEL` | `deepseek-v4-pro` | AI 模型名称 |
+| `METADATA_AI_MODEL` | `deepseek-v4-flash` | AI 模型名称 |
 | `METADATA_AI_MAX_TOKENS` | `10000` | AI 最大 Token 数 |
+| `MEDIA_LIBRARY` | `/media/library` | 媒体库目标目录（整理/刮削的默认路径） |
 
 > 环境变量优先级高于 JSON 配置文件中的对应字段。若已设置环境变量，配置文件中的同名字段将被忽略。
 
@@ -138,6 +146,14 @@ Docker Compose 会自动创建 `media-renamer-data` 卷，将配置文件和 API
 ## API 概览
 
 所有 API 端点均在 Swagger 文档（`/docs`）中完整列出。
+
+### 认证接口 (`/api/v1/auth`)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/login` | Web UI 登录 |
+| POST | `/logout` | 登出 |
+| GET | `/check` | 检查登录状态 |
 
 ### 识别接口 (`/api/v1/recognition`)
 
@@ -148,25 +164,28 @@ Docker Compose 会自动创建 `media-renamer-data` 卷，将配置文件和 API
 | POST | `/batch-recognize` | 批量识别 |
 | POST | `/batch-recognize/stream` | 批量识别（流式返回） |
 
-### 媒体操作接口 (`/api/v1/media`，仅本地模式)
+### 媒体操作接口 (`/api/v1/media`)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/preview-rename` | 预览重命名 |
-| POST | `/scrape` | 刮削元数据（NFO + 图片） |
+| POST | `/tmdb-search` | TMDb 搜索（手动刮削选配） |
+| POST | `/manual-scrape` | 手动刮削（返回列表） |
+| POST | `/manual-scrape/stream` | 手动刮削（流式） |
+| POST | `/scrape` | 自动刮削元数据（NFO + 图片） |
 | POST | `/scrape/stream` | 流式刮削 |
 | POST | `/rename` | 重命名文件 |
-| POST | `/organize` | 归档整理 |
+| POST | `/organize` | 归档整理（硬链接/复制/移动） |
 | GET | `/image` | 代理获取 TMDb 图片 |
-| GET | `/image-url` | 获取 TMDb 图片 URL |
+| GET | `/image-url` | 获取 TMDb 图片外链 |
 
-### 文件系统接口 (`/api/v1/filesystem`，仅本地模式)
+### 文件系统接口 (`/api/v1/filesystem`)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/browse` | 浏览目录内容 |
 | POST | `/scan` | 扫描目录中的媒体文件 |
-| POST | `/scan/stream` | 流式扫描 |
+| POST | `/scan/stream` | 流式扫描（NDJSON 实时推送） |
 
 ### 配置接口 (`/api/v1/config`)
 
@@ -187,20 +206,25 @@ metadata-api/
 ├── api/                     # FastAPI 应用
 │   ├── main.py              # 应用入口，路由注册
 │   ├── config.py            # 配置管理（环境变量、JSON 文件）
-│   ├── dependencies.py      # FastAPI 依赖（本地模式校验）
+│   ├── dependencies.py      # FastAPI 依赖（认证、模式校验）
 │   ├── routes/              # API 路由
+│   │   ├── auth.py          # 登录/登出
 │   │   ├── recognition.py   # 媒体识别接口
 │   │   ├── media_operations.py  # 刮削/重命名/图片接口
 │   │   ├── config.py        # 配置管理接口
 │   │   ├── filesystem.py    # 文件系统浏览/扫描接口
 │   │   └── web_ui.py        # Web UI 路由
 │   ├── schemas/             # Pydantic 数据模型
-│   │   ├── common.py        # 通用模型
+│   │   ├── common.py        # 通用模型（EpisodeMetadata）
 │   │   └── media.py         # 媒体相关模型
 │   ├── services/            # 业务逻辑
 │   │   ├── recognition_service.py   # 媒体识别服务
-│   │   ├── media_operations_service.py  # 刮削服务
+│   │   ├── media_operations_service.py  # 刮削服务（NFO/图片）
+│   │   ├── hardlink_service.py     # 硬链接/复制/移动整理
 │   │   └── ai_service.py    # AI 推断服务（OpenAI 兼容）
+│   ├── static/              # 静态资源（CSS/JS 外部分离）
+│   │   ├── css/web_ui.css   # Web UI 样式
+│   │   └── js/web_ui.js     # Web UI 交互逻辑
 │   └── templates/           # Jinja2 模板
 │       └── web_ui.html      # Web UI 页面
 ├── data/                    # 运行时数据卷（自动创建）
@@ -239,6 +263,35 @@ metadata-api/
 | [TMDb](https://www.themoviedb.org/) | 电影/剧集元数据、图片 | 是 |
 | [Bangumi](https://bgm.tv/) | 番组/动画元数据 | 可选 |
 | OpenAI 兼容 API | AI 辅助标题推断（默认 DeepSeek） | 可选 |
+
+---
+
+## 整理命名规则
+
+| 类型 | 默认格式 |
+|------|----------|
+| **电影** | `{标题} ({年份})/{标题}.{扩展名}` |
+| **电视剧** | `{标题} ({年份})/Season {季号:02d}/{标题} - S{季号:02d}E{集号:02d} - {集名}.{扩展名}` |
+
+实际效果：
+```
+/媒体库/电影/黑豹 (2018)/黑豹 (2018) 2160p Atmos.mkv
+/媒体库/电视剧/田耕纪 (2023)/Season 01/田耕纪 - S01E25 - .mp4
+```
+
+---
+
+## 更新日志
+
+### v1.1.2 (2026-05-26)
+
+- **改进**: Web UI CSS/JS 外部分离，单 HTML 从 2575 行降至 449 行
+- **修复**: 扫描/刮削接口 403 Forbidden（JavaScript fetch 缺少 Authorization header）
+- **修复**: Docker 重启后非敏感配置丢失（entrypoint 接管所有 METADATA_* 环境变量写入）
+- **修复**: 关于页面无法加载（异步竞态问题）
+- **新增**: 电视剧整理文件夹名自动追加年份 `田耕纪 (2023)`
+- **新增**: 未配置 TMDb API Key 时自动禁用硬链接/刮削 tab
+- **安全**: auth_key、ai_api_key、web_username/password 仅从环境变量注入，不入配置文件
 
 ---
 
