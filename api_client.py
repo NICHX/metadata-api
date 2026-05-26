@@ -38,10 +38,10 @@ class MetadataAPIClient:
         return response.json()
 
     def parse_filename(self, filename: str) -> dict:
-        """解析文件名（服务端期望裸字符串 body）"""
+        """解析文件名（发送 JSON 编码的字符串）"""
         response = requests.post(
             f"{self.base_url}/api/v1/recognition/parse",
-            data=filename,
+            data=json.dumps(filename),
             headers={"Content-Type": "application/json", **self._headers},
         )
         return response.json()
@@ -81,7 +81,7 @@ class MetadataAPIClient:
     def scrape_metadata(
         self,
         files: List[dict],
-        source: str = "siliconflow_tmdb",
+        source: str = "tmdb",
         download_images: bool = True,
         write_nfo: bool = True
     ) -> dict:
